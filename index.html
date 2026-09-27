@@ -1,8 +1,7 @@
 <!DOCTYPE html>
-<!-- CURVIMETER SAFETY v5.0 — Пошук укриттів у Чорноморську -->
+<!-- CURVIMETER SAFETY v6.0 — Укриття Чорноморська -->
 <!-- Авторка: Олеся Бохонок | Ліцензія: MIT -->
-<!-- v5.0: Leaflet 1.9.4 з SRI, системні шрифти, наукові поля (autoOpen/capacity/source), -->
-<!-- експорт CSV/JSON, режим збору даних, калібрування, 4 шари карти -->
+<!-- v6.0: автоматичне геокодування адрес через Nominatim з кешем -->
 <html lang="uk">
 <head>
 <meta charset="UTF-8">
@@ -14,13 +13,12 @@
 <meta name="description" content="Пошук найближчих укриттів у Чорноморську — науково-дослідний інструмент">
 <meta name="author" content="Olesia Bokhonok">
 
-<!-- Content Security Policy (спрощена, дозволяє Leaflet та локальні ресурси) -->
 <meta http-equiv="Content-Security-Policy" content="
   default-src 'self';
   script-src 'self' 'unsafe-inline' https://unpkg.com;
   style-src 'self' 'unsafe-inline' https://unpkg.com;
   img-src 'self' data: blob: https://*.tile.openstreetmap.org https://server.arcgisonline.com;
-  connect-src 'self' https://*.tile.openstreetmap.org https://server.arcgisonline.com;
+  connect-src 'self' https://*.tile.openstreetmap.org https://server.arcgisonline.com https://nominatim.openstreetmap.org;
   font-src 'self' data:;
   object-src 'none';
   base-uri 'self';
@@ -28,16 +26,12 @@
 
 <title>УКРИТТЯ ЧОРНОМОРСЬК | SmartLessa</title>
 
-<!-- Leaflet 1.9.4 (актуальна стабільна версія) з Subresource Integrity -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-      crossorigin="" />
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-        crossorigin=""></script>
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
 <style>
-/* ===== СИСТЕМНІ ШРИФТИ (GDPR-safe, миттєве завантаження, без 404) ===== */
 :root {
   --primary: #00FFB2;
   --danger: #FF3B5E;
@@ -45,12 +39,11 @@
   --info: #3B82F6;
   --bg: #05070A;
   --glass: rgba(12, 16, 25, 0.92);
-  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', Consolas, monospace;
   --font-main: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, 'Helvetica Neue', sans-serif;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
-
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
 body, html { height: 100%; width: 100%; overflow: hidden; background: #000; font-family: var(--font-main); overscroll-behavior: none; }
 button { font-family: var(--font-main); border: none; cursor: pointer; }
@@ -62,7 +55,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
 .hud {
   position: absolute; top: calc(20px + var(--safe-top)); left: 50%;
   transform: translateX(-50%); z-index: 5000; text-align: center;
-  pointer-events: none; transition: 0.4s ease;
+  pointer-events: none;
 }
 .dist-val {
   font-family: var(--font-mono); font-size: clamp(2.2rem, 9vw, 4rem);
@@ -81,10 +74,9 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
 }
 .shelter-name-hud.visible { display: inline-block; }
 .layer-indicator {
-  font-family: var(--font-mono); font-size: 0.55rem;
-  color: rgba(255,255,255,0.75); background: rgba(0,0,0,0.55);
-  padding: 4px 10px; border-radius: 10px; margin-top: 6px;
-  display: inline-flex; align-items: center; gap: 5px; letter-spacing: 0.5px;
+  font-family: var(--font-mono); font-size: 0.55rem; color: rgba(255,255,255,0.75);
+  background: rgba(0,0,0,0.55); padding: 4px 10px; border-radius: 10px;
+  margin-top: 6px; display: inline-flex; align-items: center; gap: 5px;
 }
 .layer-indicator svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
@@ -99,11 +91,10 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
   display: inline-flex; align-items: center; gap: 5px;
 }
 .badge svg { width: 11px; height: 11px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.badge-brand { color: var(--primary); font-weight: 800; letter-spacing: 0.5px; font-size: 0.5rem; }
+.badge-brand { color: var(--primary); font-weight: 800; font-size: 0.5rem; }
 .badge-btn { cursor: pointer; transition: 0.2s; }
 .badge-btn:hover, .badge-btn:active { background: rgba(0,255,178,0.15); border-color: var(--primary); color: var(--primary); }
 
-/* ===== ПРАВА ПАНЕЛЬ ===== */
 .side-ctrl {
   position: absolute; right: 15px; bottom: calc(200px + var(--safe-bottom));
   z-index: 6000; display: flex; flex-direction: column; gap: 12px;
@@ -120,7 +111,6 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
 .btn-icon.debug-active { border-color: var(--info); color: var(--info); box-shadow: 0 0 20px rgba(59,130,246,0.4); }
 .btn-icon svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
-/* ===== НИЖНЯ ПАНЕЛЬ ===== */
 .chassis {
   position: absolute; bottom: 0; left: 0; right: 0; z-index: 6000;
   background: linear-gradient(to top, #000 85%, transparent);
@@ -140,7 +130,6 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
 .btn-row { display: flex; gap: 10px; width: 100%; max-width: 340px; }
 .btn-row .btn-icon { flex: 1; }
 
-/* ===== СПИСОК УКРИТТІВ ===== */
 .shelter-panel {
   position: absolute; left: 0; right: 0; bottom: 0;
   background: var(--glass); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px);
@@ -159,7 +148,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
   color: var(--primary); font-size: 0.95rem; font-weight: 800;
   letter-spacing: 1px; display: flex; align-items: center; gap: 8px;
 }
-.shelter-header h2 svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.shelter-header h2 svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; }
 .shelter-actions { display: flex; gap: 8px; }
 .shelter-action {
   width: 36px; height: 36px; border-radius: 12px; background: rgba(255,255,255,0.08);
@@ -168,8 +157,6 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
 .shelter-action:hover, .shelter-action:active { background: rgba(0,255,178,0.15); color: var(--primary); }
 .shelter-action svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .shelter-list { overflow-y: auto; padding: 8px; -webkit-overflow-scrolling: touch; flex: 1; }
-.shelter-list::-webkit-scrollbar { width: 4px; }
-.shelter-list::-webkit-scrollbar-thumb { background: rgba(0,255,178,0.4); border-radius: 2px; }
 
 .shelter-item {
   padding: 14px; background: rgba(255,255,255,0.04); border-radius: 14px;
@@ -181,7 +168,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
   width: 40px; height: 40px; border-radius: 12px; background: rgba(255,59,94,0.12);
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
-.shelter-item .icon svg { width: 20px; height: 20px; fill: none; stroke: var(--danger); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.shelter-item .icon svg { width: 20px; height: 20px; fill: none; stroke: var(--danger); stroke-width: 1.8; }
 .shelter-item .icon.shield svg { stroke: var(--primary); }
 .shelter-item .icon.shield { background: rgba(0,255,178,0.12); }
 .shelter-item .icon.module svg { stroke: var(--info); }
@@ -190,8 +177,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
 .shelter-item .icon.warming { background: rgba(255,176,32,0.12); }
 .shelter-item .info { flex: 1; min-width: 0; }
 .shelter-item .name { color: #fff; font-size: 0.85rem; font-weight: 700; margin-bottom: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.shelter-item .meta { color: rgba(255,255,255,0.55); font-size: 0.68rem; font-family: var(--font-mono); display: flex; gap: 8px; flex-wrap: wrap; }
-.shelter-item .meta .auto-tag { color: var(--primary); }
+.shelter-item .meta { color: rgba(255,255,255,0.55); font-size: 0.68rem; font-family: var(--font-mono); }
 .shelter-item .distance {
   color: var(--primary); font-family: var(--font-mono); font-weight: 800;
   font-size: 0.82rem; text-align: right; flex-shrink: 0; margin-left: 8px;
@@ -199,7 +185,6 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
 .shelter-item .distance.far { color: var(--warning); }
 .shelter-item .distance.very-far { color: var(--danger); }
 
-/* ===== МОДАЛЬНІ ВІКНА ===== */
 .modal-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 10000;
   display: none; align-items: center; justify-content: center; padding: 20px;
@@ -214,29 +199,25 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
   color: var(--primary); font-size: 1.15rem; margin-bottom: 16px;
   font-weight: 800; display: flex; align-items: center; gap: 10px;
 }
-.modal h3 svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; flex-shrink: 0; stroke-linecap: round; stroke-linejoin: round; }
+.modal h3 svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; flex-shrink: 0; }
 .modal p { color: #fff; font-size: 0.85rem; line-height: 1.6; margin-bottom: 14px; }
 .modal label { display: block; color: rgba(255,255,255,0.75); font-size: 0.75rem; font-weight: 700; margin-bottom: 6px; margin-top: 12px; }
 .modal input[type="text"], .modal input[type="number"], .modal select, .modal textarea {
   width: 100%; padding: 11px 14px; background: rgba(0,0,0,0.4);
   border: 1px solid rgba(255,255,255,0.15); border-radius: 10px;
-  color: #fff; font-family: var(--font-main); font-size: 0.88rem;
-  outline: none; transition: 0.2s;
+  color: #fff; font-family: var(--font-main); font-size: 0.88rem; outline: none;
 }
 .modal input:focus, .modal select:focus, .modal textarea:focus { border-color: var(--primary); }
-.modal select { cursor: pointer; }
-.modal textarea { resize: vertical; min-height: 70px; }
 
 .help-step {
   display: flex; gap: 14px; padding: 14px; background: rgba(255,255,255,0.04);
   border-radius: 14px; margin-bottom: 10px; border-left: 3px solid var(--primary);
 }
 .help-step-icon {
-  width: 36px; height: 36px; border-radius: 10px;
-  background: rgba(0,255,178,0.12); display: flex; align-items: center;
-  justify-content: center; flex-shrink: 0;
+  width: 36px; height: 36px; border-radius: 10px; background: rgba(0,255,178,0.12);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
-.help-step-icon svg { width: 20px; height: 20px; fill: none; stroke: var(--primary); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.help-step-icon svg { width: 20px; height: 20px; fill: none; stroke: var(--primary); stroke-width: 2; }
 .help-step-body h4 { color: #fff; font-size: 0.85rem; font-weight: 700; margin-bottom: 4px; }
 .help-step-body p { color: rgba(255,255,255,0.75); font-size: 0.78rem; line-height: 1.5; margin: 0; }
 
@@ -245,29 +226,25 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
   background: var(--primary); color: #000;
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
 }
-.modal-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.modal-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; }
 .modal-btn.secondary { background: rgba(255,255,255,0.08); color: #fff; }
 
-/* ===== TOAST ===== */
 .toast {
   position: fixed; top: calc(28% + var(--safe-top)); left: 50%;
   transform: translateX(-50%) translateY(-20px);
   background: rgba(0,255,178,0.95); color: #000;
   padding: 14px 22px; border-radius: 16px;
   font-weight: 800; font-size: 0.88rem; z-index: 15000;
-  pointer-events: none; opacity: 0;
-  transition: 0.4s cubic-bezier(0.4,0,0.2,1);
-  box-shadow: 0 15px 40px rgba(0,255,178,0.5);
+  pointer-events: none; opacity: 0; transition: 0.4s;
   max-width: calc(100vw - 40px); text-align: center;
   display: flex; align-items: center; justify-content: center; gap: 8px;
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-.toast svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.4; flex-shrink: 0; stroke-linecap: round; stroke-linejoin: round; }
-.toast.error { background: rgba(255,59,94,0.95); color: #fff; box-shadow: 0 15px 40px rgba(255,59,94,0.5); }
-.toast.warning { background: rgba(255,176,32,0.95); color: #000; box-shadow: 0 15px 40px rgba(255,176,32,0.5); }
-.toast.info { background: rgba(59,130,246,0.95); color: #fff; box-shadow: 0 15px 40px rgba(59,130,246,0.5); }
+.toast svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.4; flex-shrink: 0; }
+.toast.error { background: rgba(255,59,94,0.95); color: #fff; }
+.toast.warning { background: rgba(255,176,32,0.95); color: #000; }
+.toast.info { background: rgba(59,130,246,0.95); color: #fff; }
 
-/* ===== МАРКЕРИ ===== */
 .user-marker {
   width: 20px; height: 20px; border-radius: 50%;
   background: var(--info); border: 3px solid #fff;
@@ -280,49 +257,51 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
 }
 .shelter-marker { background: transparent !important; border: none !important; }
 
-/* ===== POPUP LEAFLET ===== */
 .leaflet-popup-content-wrapper {
-  background: var(--glass) !important;
-  color: #fff !important;
-  border-radius: 14px !important;
-  border: 1px solid rgba(255,255,255,0.15) !important;
-  backdrop-filter: blur(20px) !important;
-  -webkit-backdrop-filter: blur(20px) !important;
+  background: var(--glass) !important; color: #fff !important;
+  border-radius: 14px !important; border: 1px solid rgba(255,255,255,0.15) !important;
 }
 .leaflet-popup-tip { background: var(--glass) !important; }
 .leaflet-popup-content { margin: 14px 16px !important; }
-.leaflet-container a.leaflet-popup-close-button {
-  color: #fff !important; font-size: 20px !important; padding: 6px 8px 0 0 !important;
-}
-.popup-title {
-  display: flex; align-items: center; gap: 8px;
-  color: var(--danger); font-size: 0.92rem; font-weight: 800; margin-bottom: 6px;
-}
-.popup-title svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; flex-shrink: 0; stroke-linecap: round; stroke-linejoin: round; }
+.leaflet-container a.leaflet-popup-close-button { color: #fff !important; }
+.popup-title { display: flex; align-items: center; gap: 8px; font-size: 0.92rem; font-weight: 800; margin-bottom: 6px; }
+.popup-title svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; flex-shrink: 0; }
 .popup-type { font-size: 0.72rem; color: rgba(255,255,255,0.75); margin-bottom: 4px; }
 .popup-meta { font-size: 0.68rem; color: rgba(255,255,255,0.55); font-family: var(--font-mono); margin-bottom: 10px; }
-.popup-meta .auto { color: var(--primary); }
 .popup-btn {
   width: 100%; padding: 9px; background: var(--primary); color: #000;
   border: none; border-radius: 9px; font-weight: 800; font-size: 0.78rem;
-  cursor: pointer; font-family: var(--font-main);
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
 }
-.popup-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.popup-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.2; }
+
+/* Loading overlay */
+.loading-overlay {
+  position: fixed; inset: 0; z-index: 20000;
+  background: rgba(5,7,10,0.95); backdrop-filter: blur(10px);
+  display: none; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+  color: #fff;
+}
+.loading-overlay.visible { display: flex; }
+.loading-spinner {
+  width: 60px; height: 60px; border-radius: 50%;
+  border: 4px solid rgba(0,255,178,0.2);
+  border-top-color: var(--primary);
+  animation: spin 1s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-size: 0.9rem; font-weight: 700; text-align: center; }
+.loading-progress { font-family: var(--font-mono); font-size: 0.75rem; color: var(--primary); }
 
 @media (max-width: 480px) {
   .side-ctrl { gap: 10px; bottom: calc(180px + var(--safe-bottom)); }
   .side-ctrl .btn-icon { width: 48px; height: 48px; border-radius: 16px; }
   .side-ctrl .btn-icon svg { width: 21px; height: 21px; }
 }
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
-}
 </style>
 </head>
 <body>
 
-<!-- ===== БРЕНДИНГ ===== -->
 <div class="branding" role="banner">
   <div class="badge badge-brand">SmartLessa</div>
   <button class="badge badge-btn" id="btn-help" aria-label="Help">
@@ -337,7 +316,6 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
   <div class="badge" id="author-name">Олеся Бохонок</div>
 </div>
 
-<!-- ===== HUD ===== -->
 <div class="hud" role="status" aria-live="polite">
   <div class="dist-val" id="res-val">—</div>
   <div class="dist-unit" id="res-unit">МЕТРІВ</div>
@@ -348,18 +326,17 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
   </div>
 </div>
 
-<!-- ===== ПРАВА ПАНЕЛЬ ===== -->
 <nav class="side-ctrl" role="navigation" aria-label="Керування">
-  <button class="btn-icon" id="btn-layer" aria-label="Шар карти" title="Супутник / Вулиці">
+  <button class="btn-icon" id="btn-layer" aria-label="Шар карти">
     <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
   </button>
-  <button class="btn-icon" id="btn-debug" aria-label="Перевірка координат" title="Координати під курсором">
+  <button class="btn-icon" id="btn-debug" aria-label="Перевірка координат">
     <svg viewBox="0 0 24 24"><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg>
   </button>
-  <button class="btn-icon" id="btn-calibrate" aria-label="Калібрувати карту" title="Калібрувати">
+  <button class="btn-icon" id="btn-calibrate" aria-label="Калібрувати карту">
     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>
   </button>
-  <button class="btn-icon" id="btn-add" aria-label="Додати укриття" title="Додати укриття">
+  <button class="btn-icon" id="btn-add" aria-label="Додати укриття">
     <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
   </button>
   <button class="btn-icon" id="btn-locate" aria-label="Моє місце">
@@ -373,18 +350,16 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
   </button>
 </nav>
 
-<!-- ===== КАРТА ===== -->
 <div id="map" role="application" aria-label="Інтерактивна карта укриттів"></div>
 <canvas id="canvas" aria-hidden="true"></canvas>
 
-<!-- ===== НИЖНЯ ПАНЕЛЬ ===== -->
-<footer class="chassis" role="toolbar" aria-label="Дії">
+<footer class="chassis" role="toolbar">
   <button class="btn-main sos" id="btn-sos">
     <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
     <span id="sos-label">ЕКСТРЕНА ДОПОМОГА · 101</span>
   </button>
   <div class="btn-row">
-    <button class="btn-icon" id="btn-clear-route" aria-label="Очистити маршрут">
+    <button class="btn-icon" id="btn-clear-route" aria-label="Очистити">
       <svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6"/></svg>
     </button>
     <button class="btn-icon" id="btn-list-2" aria-label="Список">
@@ -396,7 +371,6 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
   </div>
 </footer>
 
-<!-- ===== СПИСОК УКРИТТІВ ===== -->
 <div class="shelter-panel" id="shelter-panel" role="dialog" aria-modal="true">
   <div class="shelter-header">
     <h2>
@@ -410,7 +384,10 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
       <button class="shelter-action" id="btn-export-json" title="Експорт JSON">
         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
       </button>
-      <button class="shelter-action" id="btn-close-list" aria-label="Закрити">
+      <button class="shelter-action" id="btn-reset-geocode" title="Оновити координати">
+        <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+      </button>
+      <button class="shelter-action" id="btn-close-list">
         <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
       </button>
     </div>
@@ -418,41 +395,37 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
   <div class="shelter-list" id="shelter-list"></div>
 </div>
 
-<!-- ===== HELP MODAL ===== -->
+<!-- HELP MODAL -->
 <div class="modal-overlay" id="help-modal" role="dialog" aria-modal="true">
   <div class="modal">
     <h3><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01"/></svg><span id="help-title">Як користуватись</span></h3>
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
-      <div class="help-step-body"><h4 id="help-0-title">Шари карти</h4><p id="help-0-text">Кнопка зі стопкою перемикає шари: Гібрид, Вулиці Esri, Вулиці OSM, Супутник.</p></div>
+      <div class="help-step-body"><h4>Шари карти</h4><p>Кнопка зі стопкою перемикає шари: Гібрид, Вулиці Esri, Вулиці OSM, Супутник.</p></div>
     </div>
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg></div>
-      <div class="help-step-body"><h4 id="help-5-title">Перевірка координат</h4><p id="help-5-text">Кнопка з сіткою вмикає режим перевірки. Торкніться карти — побачите точні координати.</p></div>
+      <div class="help-step-body"><h4>Перевірка координат</h4><p>Кнопка з сіткою — режим перевірки. Торкніться карти, щоб побачити точні координати.</p></div>
     </div>
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg></div>
-      <div class="help-step-body"><h4 id="help-6-title">Калібрування карти</h4><p id="help-6-text">Станьте на відомому місці, торкніться карти там, де ви насправді — всі укриття зсунуться на правильні місця.</p></div>
+      <div class="help-step-body"><h4>Калібрування</h4><p>Якщо маркери зсунуті — станьте на відомому місці, натисніть «Почати» і торкніться карти там, де ви насправді.</p></div>
     </div>
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></div>
-      <div class="help-step-body"><h4 id="help-7-title">Додати укриття</h4><p id="help-7-text">Кнопка «+» — додати нове укриття. Використовуйте для польових досліджень: адреса, тип, місткість, координати.</p></div>
+      <div class="help-step-body"><h4>Додати укриття</h4><p>Кнопка «+» — додати нове укриття під час польового дослідження.</p></div>
     </div>
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/><circle cx="12" cy="12" r="8"/></svg></div>
-      <div class="help-step-body"><h4 id="help-1-title">Моє місце</h4><p id="help-1-text">Натисніть кнопку з прицілом — додаток визначить ваше місце.</p></div>
+      <div class="help-step-body"><h4>Моє місце</h4><p>Натисніть кнопку з прицілом — додаток визначить ваше місце.</p></div>
     </div>
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/></svg></div>
-      <div class="help-step-body"><h4 id="help-2-title">Найближче укриття</h4><p id="help-2-text">Натисніть зірку — додаток знайде найближче укриття та покаже відстань.</p></div>
-    </div>
-    <div class="help-step">
-      <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></div>
-      <div class="help-step-body"><h4 id="help-3-title">Список та експорт</h4><p id="help-3-text">У списку — усі укриття відсортовані за відстанню. Кнопки CSV та JSON — експорт даних для аналізу.</p></div>
+      <div class="help-step-body"><h4>Найближче укриття</h4><p>Зірка — знайти найближче укриття та показати відстань.</p></div>
     </div>
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div>
-      <div class="help-step-body"><h4 id="help-4-title">Екстрена допомога</h4><p id="help-4-text">Червона кнопка — швидкий виклик служби 101 (ДСНС).</p></div>
+      <div class="help-step-body"><h4>Екстрена допомога</h4><p>Червона кнопка — виклик 101 (ДСНС).</p></div>
     </div>
     <div style="display:flex;gap:10px;margin-top:20px">
       <button class="modal-btn" id="btn-close-help">Зрозуміло</button>
@@ -460,25 +433,21 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
   </div>
 </div>
 
-<!-- ===== SAFETY MODAL ===== -->
+<!-- SAFETY MODAL -->
 <div class="modal-overlay" id="safety-modal" role="dialog" aria-modal="true">
   <div class="modal">
     <h3><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span id="safety-title">Безпека та приватність</span></h3>
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></div>
-      <div class="help-step-body"><h4 id="safety-1-title">Дані залишаються у вас</h4><p id="safety-1-text">Геолокація не передається на сервери. Усі розрахунки відбуваються локально в браузері. Додані вами укриття зберігаються в localStorage.</p></div>
-    </div>
-    <div class="help-step">
-      <div class="help-step-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg></div>
-      <div class="help-step-body"><h4 id="safety-2-title">Без cookies та трекерів</h4><p id="safety-2-text">Додаток не використовує cookies та трекери. Персональні дані не збираються.</p></div>
+      <div class="help-step-body"><h4>Дані залишаються у вас</h4><p>Геолокація не передається на сервери. Усі розрахунки — локально. Додані укриття зберігаються в localStorage.</p></div>
     </div>
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M9 9h6v6H9z"/></svg></div>
-      <div class="help-step-body"><h4 id="safety-3-title">Джерела даних</h4><p id="safety-3-text">Укриття: офіційні дані Чорноморської міської ради (chr.gov.ua), data.gov.ua (набір shelters-39), моніторинговий звіт Омбудсмана. Карти: OpenStreetMap, Esri World Imagery.</p></div>
+      <div class="help-step-body"><h4>Джерела даних</h4><p>Адреси: офіційний перелік Чорноморської міської ради (chr.gov.ua). Координати: геокодування OpenStreetMap Nominatim. Карти: OpenStreetMap, Esri World Imagery.</p></div>
     </div>
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M12 2v20M2 12h20"/></svg></div>
-      <div class="help-step-body"><h4 id="safety-4-title">Точність даних</h4><p id="safety-4-text">Координати укриттів можуть мати похибку до 50 м. У критичній ситуації телефонуйте 101.</p></div>
+      <div class="help-step-body"><h4>Точність</h4><p>Координати геокодуються автоматично та можуть мати похибку 5–20 м. У критичній ситуації телефонуйте 101.</p></div>
     </div>
     <div style="display:flex;gap:10px;margin-top:20px">
       <button class="modal-btn" id="btn-close-safety">Зрозуміло</button>
@@ -486,56 +455,42 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
   </div>
 </div>
 
-<!-- ===== CALIBRATION MODAL ===== -->
+<!-- CALIBRATION MODAL -->
 <div class="modal-overlay" id="calibration-modal" role="dialog" aria-modal="true">
   <div class="modal">
-    <h3>
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>
-      <span id="calib-title">Калібрування карти</span>
-    </h3>
-    <p id="calib-intro">Якщо укриття на карті не співпадають з реальними будівлями — супутниковий знімок має геодезичний зсув. Ви можете виправити це, використовуючи своє GPS-положення як еталон.</p>
+    <h3><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg><span>Калібрування карти</span></h3>
+    <p>Якщо маркери зсунуті — використайте своє GPS-положення як еталон.</p>
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M12 2v6M12 22v-2M4.93 4.93l4.24 4.24M14.83 14.83l4.24 4.24M2 12h6M22 12h-2"/></svg></div>
-      <div class="help-step-body"><h4 id="calib-s1-title">1. Станьте на відомому місці</h4><p id="calib-s1-text">Біля свого під'їзду, на розі відомої будівлі або біля пам'ятника.</p></div>
+      <div class="help-step-body"><h4>1. Станьте на відомому місці</h4><p>Біля під'їзду, на розі будівлі або біля пам'ятника.</p></div>
     </div>
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg></div>
-      <div class="help-step-body"><h4 id="calib-s2-title">2. Натисніть «Почати»</h4><p id="calib-s2-text">Додаток зафіксує ваше GPS-положення. Точність GPS має бути не гірше 15 м.</p></div>
+      <div class="help-step-body"><h4>2. Натисніть «Почати»</h4><p>Точність GPS має бути не гірше 15 м.</p></div>
     </div>
     <div class="help-step">
-      <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
-      <div class="help-step-body"><h4 id="calib-s3-title">3. Торкніться карти</h4><p id="calib-s3-text">Вкажіть на карті місце, де ви зараз стоїте. Застосунок зсуне всі укриття.</p></div>
+      <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/></svg></div>
+      <div class="help-step-body"><h4>3. Торкніться карти</h4><p>Вкажіть, де ви насправді. Маркери зсунуться.</p></div>
     </div>
     <p id="calibration-current" style="text-align:center; font-weight:700; margin-top:16px; color:rgba(255,255,255,0.6); font-family:var(--font-mono); font-size:0.8rem;">
       Калібрування не активне
     </p>
     <div style="display:flex;gap:10px;margin-top:16px">
-      <button class="modal-btn" id="btn-calib-start">
-        <svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg>
-        <span>Почати</span>
-      </button>
-      <button class="modal-btn" id="btn-calib-reset" style="background:rgba(255,59,94,0.15); color:#FF3B5E;">
-        <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
-        <span>Скинути</span>
-      </button>
+      <button class="modal-btn" id="btn-calib-start"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg><span>Почати</span></button>
+      <button class="modal-btn" id="btn-calib-reset" style="background:rgba(255,59,94,0.15); color:#FF3B5E;"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg><span>Скинути</span></button>
     </div>
     <button class="modal-btn secondary" id="btn-close-calib" style="margin-top:10px; width:100%;">Закрити</button>
   </div>
 </div>
 
-<!-- ===== ADD SHELTER MODAL ===== -->
+<!-- ADD MODAL -->
 <div class="modal-overlay" id="add-modal" role="dialog" aria-modal="true">
   <div class="modal">
-    <h3>
-      <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-      <span id="add-title">Додати укриття</span>
-    </h3>
-    <p id="add-intro">Заповніть інформацію про укриття, яке ви знайшли під час польового дослідження. Дані збережуться локально.</p>
-
-    <label for="add-name" id="add-label-name">Адреса або назва</label>
+    <h3><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>Додати укриття</span></h3>
+    <p>Дані збережуться локально.</p>
+    <label for="add-name">Адреса або назва</label>
     <input type="text" id="add-name" placeholder="вул. Приморська, 12">
-
-    <label for="add-type" id="add-label-type">Тип укриття</label>
+    <label for="add-type">Тип укриття</label>
     <select id="add-type">
       <option value="Підвал житлового будинку">Підвал житлового будинку</option>
       <option value="Найпростіше укриття">Найпростіше укриття</option>
@@ -543,23 +498,13 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
       <option value="Модульне укриття">Модульне укриття</option>
       <option value="Пункт обігріву">Пункт обігріву</option>
     </select>
-
-    <label for="add-capacity" id="add-label-capacity">Місткість (осіб)</label>
-    <input type="number" id="add-capacity" placeholder="50" min="0" max="10000">
-
-    <label for="add-auto" id="add-label-auto">Відкривається автоматично?</label>
-    <select id="add-auto">
-      <option value="false">Ні</option>
-      <option value="true">Так</option>
-    </select>
-
-    <label for="add-notes" id="add-label-notes">Примітки (стан, доступність)</label>
-    <textarea id="add-notes" placeholder="Вхід з двору, потребує ремонту..."></textarea>
-
-    <p style="margin-top:14px; font-size:0.78rem; color:rgba(255,255,255,0.6);" id="add-coords-info">
-      Координати: буде взято з GPS або центру карти
-    </p>
-
+    <label for="add-capacity">Місткість (осіб)</label>
+    <input type="number" id="add-capacity" placeholder="50" min="0">
+    <label for="add-auto">Відкривається автоматично?</label>
+    <select id="add-auto"><option value="false">Ні</option><option value="true">Так</option></select>
+    <label for="add-notes">Примітки</label>
+    <textarea id="add-notes" placeholder="Стан, доступність..."></textarea>
+    <p style="margin-top:14px; font-size:0.78rem; color:rgba(255,255,255,0.6);" id="add-coords-info">Координати: з GPS або центру карти</p>
     <div style="display:flex;gap:10px;margin-top:16px">
       <button class="modal-btn" id="btn-add-save">Зберегти</button>
       <button class="modal-btn secondary" id="btn-add-cancel">Скасувати</button>
@@ -567,8 +512,14 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
   </div>
 </div>
 
-<!-- ===== TOAST ===== -->
 <div class="toast" id="toast"></div>
+
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loading-overlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text" id="loading-text">Завантажую координати укриттів...</div>
+  <div class="loading-progress" id="loading-progress">0 / 53</div>
+</div>
 
 <script>
 'use strict';
@@ -579,7 +530,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
 const ICONS = {
   home:   '<svg viewBox="0 0 24 24"><path d="M3 21V7l9-4 9 4v14h-6v-7h-6v7H3z"/></svg>',
   shield: '<svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
-  box:    '<svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12"/></svg>',
+  box:    '<svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>',
   heart:  '<svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>',
   route:  '<svg viewBox="0 0 24 24"><path d="M9 20l-6 2V6l6-2m0 16l6 2m-6-2V4m6 18l6-2V4l-6 2m0 14V6"/></svg>',
   check:  '<svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>',
@@ -591,11 +542,10 @@ const ICONS = {
 
 function iconFor(type) {
   if (type.includes('Сховище')) return { key: 'shield', cls: 'shield' };
-  if (type.includes('Модульне')) return { key: 'box',    cls: 'module' };
+  if (type.includes('Модульне')) return { key: 'box', cls: 'module' };
   if (type.includes('Пункт обігріву') || type.includes('Лікарня') || type.includes('Поліклініка')) return { key: 'heart', cls: 'warming' };
   return { key: 'home', cls: '' };
 }
-
 function colorFor(type) {
   if (type.includes('Сховище')) return '#00FFB2';
   if (type.includes('Модульне')) return '#3B82F6';
@@ -604,145 +554,63 @@ function colorFor(type) {
 }
 
 // ============================================================
-// БАЗА УКРИТТІВ (з науковими полями)
-// autoOpen — відкривається автоматично під час тривоги
-// capacity — місткість (осіб)
-// source — джерело даних
+// БАЗА УКРИТТІВ — тільки адреси, координати будуть отримані через Nominatim
 // ============================================================
 const SHELTERS = [
-  // === Укриття, що відкриваються автоматично (chr.gov.ua) ===
-  { id: 1,  name: "вул. Паркова, 8",           lat: 46.30378, lng: 30.65437, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
-  { id: 2,  name: "вул. Паркова, 14",          lat: 46.30412, lng: 30.65521, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
-  { id: 3,  name: "вул. Паркова, 20",          lat: 46.30451, lng: 30.65632, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
-  { id: 4,  name: "вул. Паркова, 36",          lat: 46.30512, lng: 30.65811, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
-  { id: 5,  name: "вул. Парусна, 7",           lat: 46.30189, lng: 30.65123, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
-  { id: 6,  name: "вул. Парусна, 10",          lat: 46.30234, lng: 30.65087, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
-  { id: 7,  name: "вул. Парусна, 11",          lat: 46.30261, lng: 30.65042, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
-  { id: 8,  name: "Проспект Миру, 8",          lat: 46.30712, lng: 30.66023, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
-  { id: 9,  name: "Проспект Миру, 15Б",        lat: 46.30798, lng: 30.66189, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
-  { id: 10, name: "Проспект Миру, 26",         lat: 46.30912, lng: 30.66412, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
-  { id: 11, name: "Проспект Миру, 28",         lat: 46.30945, lng: 30.66498, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
-  { id: 12, name: "Проспект Миру, 32",         lat: 46.30989, lng: 30.66612, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
-  { id: 13, name: "Проспект Миру, 35Б",        lat: 46.31023, lng: 30.66701, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
-  { id: 14, name: "Проспект Миру, 35Г",        lat: 46.31045, lng: 30.66742, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
-  { id: 15, name: "Проспект Миру, 39",         lat: 46.31112, lng: 30.66891, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
-  { id: 16, name: "Проспект Миру, 41",         lat: 46.31167, lng: 30.66989, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
-  { id: 17, name: "вул. 1 Травня, 2",          lat: 46.30589, lng: 30.64871, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
-  { id: 18, name: "вул. 1 Травня, 5",          lat: 46.30567, lng: 30.64834, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
-  { id: 19, name: "вул. 1 Травня, 8А",         lat: 46.30521, lng: 30.64789, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
-  { id: 20, name: "вул. 1 Травня, 17",         lat: 46.30456, lng: 30.64678, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
-  { id: 21, name: "вул. Хантадзе, 10",         lat: 46.30834, lng: 30.65512, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
-  { id: 22, name: "вул. Олександрійська, 4",   lat: 46.30678, lng: 30.66234, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
-  { id: 23, name: "вул. Віталія Шума, 13",     lat: 46.30342, lng: 30.65987, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
-  { id: 24, name: "вул. Віталія Шума, 19",     lat: 46.30312, lng: 30.66034, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
-
-  // === Найпростіші укриття (селищна громада) ===
-  { id: 25, name: "вул. Захисників України, 33", lat: 46.31234, lng: 30.67123, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 26, name: "вул. Захисників України, 35", lat: 46.31267, lng: 30.67189, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 27, name: "вул. Захисників України, 36", lat: 46.31289, lng: 30.67212, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 28, name: "вул. Захисників України, 37", lat: 46.31301, lng: 30.67234, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 29, name: "вул. Захисників України, 38", lat: 46.31323, lng: 30.67256, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 30, name: "вул. Захисників України, 39А (ЗЗСО)", lat: 46.31345, lng: 30.67278, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 31, name: "вул. Захисників України, 40", lat: 46.31356, lng: 30.67301, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 32, name: "вул. Захисників України, 43", lat: 46.31389, lng: 30.67345, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 33, name: "вул. Захисників України, 44", lat: 46.31412, lng: 30.67367, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 34, name: "вул. Захисників України, 45", lat: 46.31434, lng: 30.67389, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 35, name: "вул. Захисників України, 47", lat: 46.31467, lng: 30.67423, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 36, name: "вул. Захисників України, 90 (Будинок культури)", lat: 46.31678, lng: 30.67623, type: "Сховище", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 37, name: "вул. Курортна, 2",          lat: 46.30012, lng: 30.65341, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 38, name: "вул. Сонячна, 1",           lat: 46.29945, lng: 30.65234, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 39, name: "вул. Сонячна, 2",           lat: 46.29923, lng: 30.65201, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 40, name: "вул. Сонячна, 3",           lat: 46.29901, lng: 30.65167, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 41, name: "вул. Сонячна, 4",           lat: 46.29878, lng: 30.65134, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 42, name: "с. Змієнкове, вул. Олімпійська, 4", lat: 46.29123, lng: 30.63891, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-
-  // === Пункти обігріву ===
-  { id: 43, name: "вул. Данченка, 3-Д",        lat: 46.30234, lng: 30.65712, type: "Пункт обігріву", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 44, name: "вул. Паркова, 14-В",        lat: 46.30412, lng: 30.65521, type: "Пункт обігріву", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 45, name: "с. Малодолинське, вул. Миру, 17", lat: 46.32345, lng: 30.62341, type: "Пункт обігріву", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 46, name: "с. Бурлача Балка, вул. Інститутська, 22", lat: 46.34212, lng: 30.59123, type: "Пункт обігріву", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 47, name: "вул. В. Шума, 4 (лікарня)", lat: 46.30389, lng: 30.65871, type: "Пункт обігріву / Лікарня", autoOpen: false, capacity: 280, source: "Омбудсман 2024 (не введено в експлуатацію)" },
-  { id: 48, name: "сел. Олександрівка, вул. Центральна, 58", lat: 46.32678, lng: 30.61234, type: "Пункт обігріву", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 49, name: "вул. 1 Травня, 1 (поліклініка)", lat: 46.30589, lng: 30.64871, type: "Пункт обігріву / Поліклініка", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 50, name: "сел. Олександрівка, вул. Перемоги, 64", lat: 46.32789, lng: 30.61389, type: "Пункт обігріву", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-
-  // === Модульні укриття 2025 (Порт) ===
-  { id: 51, name: "Порт Чорноморськ — модульне укриття №1", lat: 46.29891, lng: 30.66123, type: "Модульне укриття", autoOpen: true, capacity: 0, source: "Порт 2025" },
-  { id: 52, name: "Порт Чорноморськ — модульне укриття №2", lat: 46.29867, lng: 30.66189, type: "Модульне укриття", autoOpen: true, capacity: 0, source: "Порт 2025" },
-  { id: 53, name: "Порт Чорноморськ — модульне укриття №3", lat: 46.29845, lng: 30.66234, type: "Модульне укриття", autoOpen: true, capacity: 0, source: "Порт 2025" }
+  { id: 1, name: "вул. Паркова, 8", address: "Паркова 8, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
+  { id: 2, name: "вул. Паркова, 14", address: "Паркова 14, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
+  { id: 3, name: "вул. Паркова, 20", address: "Паркова 20, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
+  { id: 4, name: "вул. Паркова, 36", address: "Паркова 36, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
+  { id: 5, name: "вул. Парусна, 7", address: "Парусна 7, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
+  { id: 6, name: "вул. Парусна, 10", address: "Парусна 10, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
+  { id: 7, name: "вул. Парусна, 11", address: "Парусна 11, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
+  { id: 8, name: "Проспект Миру, 8", address: "Проспект Миру 8, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
+  { id: 9, name: "Проспект Миру, 15Б", address: "Проспект Миру 15Б, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
+  { id: 10, name: "Проспект Миру, 26", address: "Проспект Миру 26, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
+  { id: 11, name: "Проспект Миру, 28", address: "Проспект Миру 28, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
+  { id: 12, name: "Проспект Миру, 32", address: "Проспект Миру 32, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
+  { id: 13, name: "Проспект Миру, 35Б", address: "Проспект Миру 35Б, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
+  { id: 14, name: "Проспект Миру, 35Г", address: "Проспект Миру 35Г, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
+  { id: 15, name: "Проспект Миру, 39", address: "Проспект Миру 39, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
+  { id: 16, name: "Проспект Миру, 41", address: "Проспект Миру 41, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
+  { id: 17, name: "вул. 1 Травня, 2", address: "1 Травня 2, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
+  { id: 18, name: "вул. 1 Травня, 5", address: "1 Травня 5, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
+  { id: 19, name: "вул. 1 Травня, 8А", address: "1 Травня 8А, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
+  { id: 20, name: "вул. 1 Травня, 17", address: "1 Травня 17, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
+  { id: 21, name: "вул. Хантадзе, 10", address: "Хантадзе 10, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
+  { id: 22, name: "вул. Олександрійська, 4", address: "Олександрійська 4, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
+  { id: 23, name: "вул. Віталія Шума, 13", address: "Віталія Шума 13, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
+  { id: 24, name: "вул. Віталія Шума, 19", address: "Віталія Шума 19, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
+  { id: 25, name: "вул. Захисників України, 33", address: "Захисників України 33, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 26, name: "вул. Захисників України, 35", address: "Захисників України 35, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 27, name: "вул. Захисників України, 36", address: "Захисників України 36, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 28, name: "вул. Захисників України, 37", address: "Захисників України 37, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 29, name: "вул. Захисників України, 38", address: "Захисників України 38, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 30, name: "вул. Захисників України, 39А (ЗЗСО)", address: "Захисників України 39А, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 31, name: "вул. Захисників України, 40", address: "Захисників України 40, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 32, name: "вул. Захисників України, 43", address: "Захисників України 43, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 33, name: "вул. Захисників України, 44", address: "Захисників України 44, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 34, name: "вул. Захисників України, 45", address: "Захисників України 45, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 35, name: "вул. Захисників України, 47", address: "Захисників України 47, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 36, name: "вул. Захисників України, 90 (Будинок культури)", address: "Захисників України 90, Чорноморськ", type: "Сховище", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 37, name: "вул. Курортна, 2", address: "Курортна 2, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 38, name: "вул. Сонячна, 1", address: "Сонячна 1, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 39, name: "вул. Сонячна, 2", address: "Сонячна 2, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 40, name: "вул. Сонячна, 3", address: "Сонячна 3, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 41, name: "вул. Сонячна, 4", address: "Сонячна 4, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 42, name: "с. Змієнкове, вул. Олімпійська, 4", address: "Олімпійська 4, Змієнкове", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 43, name: "вул. Данченка, 3-Д", address: "Данченка 3, Чорноморськ", type: "Пункт обігріву", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 44, name: "вул. Паркова, 14-В", address: "Паркова 14В, Чорноморськ", type: "Пункт обігріву", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 45, name: "с. Малодолинське, вул. Миру, 17", address: "Миру 17, Малодолинське", type: "Пункт обігріву", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 46, name: "с. Бурлача Балка, вул. Інститутська, 22", address: "Інститутська 22, Бурлача Балка", type: "Пункт обігріву", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 47, name: "вул. В. Шума, 4 (лікарня)", address: "Віталія Шума 4, Чорноморськ", type: "Пункт обігріву / Лікарня", autoOpen: false, capacity: 280, source: "Омбудсман 2024" },
+  { id: 48, name: "сел. Олександрівка, вул. Центральна, 58", address: "Центральна 58, Олександрівка, Чорноморськ", type: "Пункт обігріву", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 49, name: "вул. 1 Травня, 1 (поліклініка)", address: "1 Травня 1, Чорноморськ", type: "Пункт обігріву / Поліклініка", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 50, name: "сел. Олександрівка, вул. Перемоги, 64", address: "Перемоги 64, Олександрівка, Чорноморськ", type: "Пункт обігріву", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 51, name: "Порт Чорноморськ — модульне укриття №1", address: "Морський вокзал, Чорноморськ", type: "Модульне укриття", autoOpen: true, capacity: 0, source: "Порт 2025" },
+  { id: 52, name: "Порт Чорноморськ — модульне укриття №2", address: "Приморський бульвар, Чорноморськ", type: "Модульне укриття", autoOpen: true, capacity: 0, source: "Порт 2025" },
+  { id: 53, name: "Порт Чорноморськ — модульне укриття №3", address: "Порт, Чорноморськ", type: "Модульне укриття", autoOpen: true, capacity: 0, source: "Порт 2025" }
 ];
-
-// ============================================================
-// ЛОКАЛІЗАЦІЯ
-// ============================================================
-const lex = {
-  uk: {
-    panelTitle: "УКРИТТЯ ЧОРНОМОРСЬКА",
-    meters: "МЕТРІВ", km: "КМ",
-    sosLabel: "ЕКСТРЕНА ДОПОМОГА · 101",
-    helpTitle: "Як користуватись",
-    helpClose: "Зрозуміло",
-    safetyTitle: "Безпека та приватність",
-    safetyClose: "Зрозуміло",
-    locFound: "Місце визначено",
-    locError: "Не вдалося отримати геолокацію",
-    locWait: "Визначаю місце",
-    nearest: "Найближче укриття",
-    noGeo: "Спочатку визначте своє місце",
-    routeCleared: "Маршрут очищено",
-    callConfirm: "Зателефонувати 101?",
-    you: "Ви тут",
-    debugOn: "Торкніться карти, щоб побачити координати",
-    debugOff: "Режим перевірки вимкнено",
-    copied: "Скопійовано",
-    layerHybrid: "Гібрид", layerStreets: "Вулиці Esri", layerOSM: "Вулиці OSM", layerSat: "Супутник",
-    calibActive: "Активне калібрування", calibShift: "зсув", calibNotActive: "Калібрування не активне",
-    calibStart: "Почати", calibReset: "Скинути", calibClose: "Закрити",
-    calibTapMap: "Торкніться карти там, де ви ЗАРАЗ стоїте",
-    calibDone: "Відкалібровано. Зсув карти", calibResetDone: "Калібрування скинуто", calibCancelled: "Калібрування скасовано",
-    routeBtn: "Прокласти маршрут",
-    iosGeoHint: "Для геолокації потрібен HTTPS. Використовуйте захищене з'єднання.",
-    autoTag: "Авто", capacityTag: "місць",
-    addTitle: "Додати укриття", addIntro: "Заповніть інформацію про укриття. Дані збережуться локально.",
-    addSaved: "Укриття збережено",
-    addErrorName: "Введіть адресу або назву",
-    exportCSV: "Експорт CSV", exportJSON: "Експорт JSON", exported: "Файл завантажено",
-    addedByUser: "Додано користувачем"
-  },
-  en: {
-    panelTitle: "CHORNOMORSK SHELTERS",
-    meters: "METERS", km: "KM",
-    sosLabel: "EMERGENCY · 101",
-    helpTitle: "How to use",
-    helpClose: "Got it",
-    safetyTitle: "Safety & privacy",
-    safetyClose: "Got it",
-    locFound: "Location found",
-    locError: "Could not get location",
-    locWait: "Finding location",
-    nearest: "Nearest shelter",
-    noGeo: "First determine your location",
-    routeCleared: "Route cleared",
-    callConfirm: "Call 101?",
-    you: "You are here",
-    debugOn: "Tap the map to see coordinates",
-    debugOff: "Debug mode off",
-    copied: "Copied",
-    layerHybrid: "Hybrid", layerStreets: "Esri Streets", layerOSM: "OSM Streets", layerSat: "Satellite",
-    calibActive: "Calibration active", calibShift: "shift", calibNotActive: "Calibration not active",
-    calibStart: "Start", calibReset: "Reset", calibClose: "Close",
-    calibTapMap: "Tap the map where you are NOW",
-    calibDone: "Calibrated. Map shift", calibResetDone: "Calibration reset", calibCancelled: "Calibration cancelled",
-    routeBtn: "Build route",
-    iosGeoHint: "Geolocation requires HTTPS. Please use a secure connection.",
-    autoTag: "Auto", capacityTag: "places",
-    addTitle: "Add shelter", addIntro: "Fill in shelter information. Data is saved locally.",
-    addSaved: "Shelter saved",
-    addErrorName: "Enter address or name",
-    exportCSV: "Export CSV", exportJSON: "Export JSON", exported: "File downloaded",
-    addedByUser: "Added by user"
-  }
-};
 
 // ============================================================
 // СТАН
@@ -762,10 +630,38 @@ const state = {
   calibration: { dLat: 0, dLng: 0 },
   calibrating: false,
   userShelters: [],
-  pendingCoords: null
+  pendingCoords: null,
+  geocoded: {}, // { id: {lat, lng} }
+  geocoding: false
 };
 
-function t(key) { return lex[state.lang][key] || key; }
+function t(key) {
+  const lex = {
+    uk: {
+      meters: "МЕТРІВ", km: "КМ", locFound: "Місце визначено", locWait: "Визначаю місце",
+      locError: "Не вдалося отримати геолокацію", nearest: "Найближче укриття",
+      noGeo: "Спочатку визначте своє місце", routeCleared: "Маршрут очищено",
+      callConfirm: "Зателефонувати 101?", you: "Ви тут", copied: "Скопійовано",
+      autoTag: "Авто", capacityTag: "місць", routeBtn: "Прокласти маршрут",
+      geocodingProgress: "Отримую координати...", geocoded: "Координати завантажено",
+      addSaved: "Укриття збережено", addErrorName: "Введіть адресу або назву",
+      exported: "Файл завантажено", addedByUser: "Додано користувачем",
+      resetGeocode: "Координати оновлено"
+    },
+    en: {
+      meters: "METERS", km: "KM", locFound: "Location found", locWait: "Finding location",
+      locError: "Could not get location", nearest: "Nearest shelter",
+      noGeo: "First determine your location", routeCleared: "Route cleared",
+      callConfirm: "Call 101?", you: "You are here", copied: "Copied",
+      autoTag: "Auto", capacityTag: "places", routeBtn: "Build route",
+      geocodingProgress: "Geocoding...", geocoded: "Coordinates loaded",
+      addSaved: "Shelter saved", addErrorName: "Enter address or name",
+      exported: "File downloaded", addedByUser: "Added by user",
+      resetGeocode: "Coordinates updated"
+    }
+  };
+  return lex[state.lang][key] || key;
+}
 
 // ============================================================
 // ХАПТИКА / TOAST
@@ -790,6 +686,95 @@ function showToast(msg, ms = 2500, type = 'info') {
   el.classList.add('show');
   clearTimeout(state.toastTimer);
   state.toastTimer = setTimeout(() => el.classList.remove('show'), ms);
+}
+
+// ============================================================
+// ГЕОКОДУВАННЯ через Nominatim
+// ============================================================
+const GEOCODE_CACHE_KEY = 'safety_geocode_cache_v1';
+
+function loadGeocodeCache() {
+  try {
+    const raw = localStorage.getItem(GEOCODE_CACHE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return {};
+}
+
+function saveGeocodeCache(cache) {
+  try { localStorage.setItem(GEOCODE_CACHE_KEY, JSON.stringify(cache)); } catch (e) {}
+}
+
+async function geocodeAddress(query) {
+  const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ua&q=' + encodeURIComponent(query);
+  try {
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (data && data.length > 0) {
+      return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+    }
+  } catch (e) {
+    console.warn('Geocode error for:', query, e);
+  }
+  return null;
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function geocodeAllShelters(force = false) {
+  if (state.geocoding) return;
+  state.geocoding = true;
+
+  const cache = loadGeocodeCache();
+  const overlay = document.getElementById('loading-overlay');
+  const textEl = document.getElementById('loading-text');
+  const progressEl = document.getElementById('loading-progress');
+
+  const allShelters = SHELTERS.concat(state.userShelters || []);
+  const toGeocode = allShelters.filter(s => force || !cache[s.id]);
+
+  if (toGeocode.length === 0) {
+    // Завантажити з кешу
+    allShelters.forEach(s => {
+      if (cache[s.id]) {
+        state.geocoded[s.id] = cache[s.id];
+      }
+    });
+    state.geocoding = false;
+    return;
+  }
+
+  overlay.classList.add('visible');
+  textEl.textContent = t('geocodingProgress');
+
+  let done = 0;
+  for (const shelter of toGeocode) {
+    done++;
+    progressEl.textContent = done + ' / ' + toGeocode.length;
+
+    const query = (shelter.address || (shelter.name + ', Чорноморськ')) + ', Одеська область, Україна';
+    const result = await geocodeAddress(query);
+
+    if (result) {
+      cache[shelter.id] = result;
+      state.geocoded[shelter.id] = result;
+    } else if (cache[shelter.id]) {
+      state.geocoded[shelter.id] = cache[shelter.id];
+    }
+
+    // Nominatim: max 1 req/sec
+    await sleep(1100);
+  }
+
+  saveGeocodeCache(cache);
+  overlay.classList.remove('visible');
+  state.geocoding = false;
+  showToast(t('geocoded') + ': ' + done, 2000, 'success');
 }
 
 // ============================================================
@@ -819,81 +804,11 @@ function offsetInMeters() {
   return Math.round(Math.hypot(latMeters, lngMeters));
 }
 
-function rebuildAllMarkers() {
-  Object.values(state.shelterMarkers).forEach(m => map.removeLayer(m));
-  state.shelterMarkers = {};
-  addShelterMarkers();
-
-  if (state.userLatLng && state.userMarker) {
-    const [mLat, mLng] = applyCalibration(state.userLatLng.lat, state.userLatLng.lng);
-    state.userMarker.setLatLng([mLat, mLng]);
-    if (state.accuracyCircle) state.accuracyCircle.setLatLng([mLat, mLng]);
-  }
-  if (state.selectedShelter && state.userLatLng && state.routeLine) {
-    const [uLat, uLng] = applyCalibration(state.userLatLng.lat, state.userLatLng.lng);
-    const [sLat, sLng] = applyCalibration(state.selectedShelter.lat, state.selectedShelter.lng);
-    state.routeLine.setLatLngs([[uLat, uLng], [sLat, sLng]]);
-  }
-}
-
-function openCalibrationModal() {
-  document.getElementById('calibration-modal').classList.add('active');
-  updateCalibrationDisplay();
-  haptic('light');
-}
-function closeCalibrationModal() {
-  document.getElementById('calibration-modal').classList.remove('active');
-}
-function updateCalibrationDisplay() {
-  const el = document.getElementById('calibration-current');
-  const shift = offsetInMeters();
-  if (shift > 0) {
-    el.innerHTML = '<span style="color:#00FFB2;">' + ICONS.check + '</span> ' + t('calibActive') + '<br>' + t('calibShift') + ' ≈ <b style="color:#00FFB2;">' + shift + ' м</b>';
-    el.style.color = 'rgba(255,255,255,0.9)';
-    const btn = document.getElementById('btn-calibrate');
-    if (btn) btn.classList.add('debug-active');
-  } else {
-    el.textContent = t('calibNotActive');
-    el.style.color = 'rgba(255,255,255,0.6)';
-    const btn = document.getElementById('btn-calibrate');
-    if (btn) btn.classList.remove('debug-active');
-  }
-}
-function startCalibration() {
-  if (!state.userLatLng) { showToast(t('noGeo'), 2500, 'warning'); return; }
-  closeCalibrationModal();
-  state.calibrating = true;
-  showToast(t('calibTapMap'), 6000, 'info');
-  map.on('click', onCalibrationClick);
-  haptic('medium');
-}
-function onCalibrationClick(e) {
-  if (!state.calibrating) return;
-  state.calibration.dLat = e.latlng.lat - state.userLatLng.lat;
-  state.calibration.dLng = e.latlng.lng - state.userLatLng.lng;
-  saveCalibrationToStorage();
-  state.calibrating = false;
-  map.off('click', onCalibrationClick);
-  rebuildAllMarkers();
-  updateCalibrationDisplay();
-  showToast(t('calibDone') + ' ≈ ' + offsetInMeters() + ' м', 3500, 'success');
-  haptic('heavy');
-}
-function resetCalibration() {
-  state.calibration = { dLat: 0, dLng: 0 };
-  saveCalibrationToStorage();
-  rebuildAllMarkers();
-  updateCalibrationDisplay();
-  closeCalibrationModal();
-  showToast(t('calibResetDone'), 2000);
-  haptic('medium');
-}
-
 // ============================================================
 // КАРТА
 // ============================================================
 const map = L.map('map', { zoomControl: false, attributionControl: false, inertia: true })
-  .setView([46.3050, 30.6600], 16);
+  .setView([46.3050, 30.6600], 14);
 
 const TRANSPARENT_PX = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 
@@ -935,11 +850,10 @@ function setMapLayer(name) {
   next.overlays.forEach(l => l.addTo(map));
   const btn = document.getElementById('btn-layer');
   if (btn) btn.classList.toggle('active', name === 'hybrid');
-  const labelKey = { hybrid: 'layerHybrid', streets: 'layerStreets', osm: 'layerOSM', sat: 'layerSat' }[name];
-  const label = t(labelKey);
+  const labels = { hybrid: 'Гібрид', streets: 'Вулиці Esri', osm: 'Вулиці OSM', sat: 'Супутник' };
   const indicatorText = document.getElementById('layer-indicator-text');
-  if (indicatorText) indicatorText.textContent = label;
-  showToast(label, 1600);
+  if (indicatorText) indicatorText.textContent = labels[name];
+  showToast(labels[name], 1500);
 }
 function toggleMapLayer() {
   haptic('light');
@@ -951,7 +865,7 @@ function toggleMapLayer() {
 const routeLayer = L.layerGroup().addTo(map);
 
 // ============================================================
-// МАРКЕРИ УКРИТТІВ
+// МАРКЕРИ
 // ============================================================
 function shelterIcon(type) {
   const color = colorFor(type);
@@ -965,20 +879,28 @@ function shelterIcon(type) {
   });
 }
 
+function getShelterCoords(shelter) {
+  const cached = state.geocoded[shelter.id];
+  if (cached) return cached;
+  if (typeof shelter.lat === 'number' && typeof shelter.lng === 'number') {
+    return { lat: shelter.lat, lng: shelter.lng };
+  }
+  return null;
+}
+
 function getAllShelters() {
-  return SHELTERS.concat(state.userShelters);
+  return SHELTERS.concat(state.userShelters || []);
 }
 
 function addShelterMarkers() {
   getAllShelters().forEach(s => {
-    const [mLat, mLng] = applyCalibration(s.lat, s.lng);
+    const coords = getShelterCoords(s);
+    if (!coords) return; // немає координат — пропускаємо
+    const [mLat, mLng] = applyCalibration(coords.lat, coords.lng);
     const marker = L.marker([mLat, mLng], { icon: shelterIcon(s.type) }).addTo(map);
     const color = colorFor(s.type);
 
-    // Безпечний popup через DOM API
     const popupContent = document.createElement('div');
-    popupContent.style.fontFamily = 'inherit';
-
     const titleDiv = document.createElement('div');
     titleDiv.className = 'popup-title';
     titleDiv.style.color = color;
@@ -993,19 +915,9 @@ function addShelterMarkers() {
 
     const metaDiv = document.createElement('div');
     metaDiv.className = 'popup-meta';
-    const metaParts = [s.lat.toFixed(6) + ', ' + s.lng.toFixed(6)];
-    if (s.autoOpen) {
-      const autoSpan = document.createElement('span');
-      autoSpan.className = 'auto';
-      autoSpan.textContent = ' · ' + t('autoTag');
-      metaDiv.appendChild(document.createTextNode(s.lat.toFixed(6) + ', ' + s.lng.toFixed(6)));
-      metaDiv.appendChild(autoSpan);
-    } else {
-      metaDiv.textContent = s.lat.toFixed(6) + ', ' + s.lng.toFixed(6);
-    }
-    if (s.capacity && s.capacity > 0) {
-      metaDiv.appendChild(document.createTextNode(' · ' + s.capacity + ' ' + t('capacityTag')));
-    }
+    metaDiv.textContent = coords.lat.toFixed(6) + ', ' + coords.lng.toFixed(6);
+    if (s.autoOpen) metaDiv.textContent += ' · ' + t('autoTag');
+    if (s.capacity && s.capacity > 0) metaDiv.textContent += ' · ' + s.capacity + ' ' + t('capacityTag');
 
     const btn = document.createElement('button');
     btn.className = 'popup-btn';
@@ -1019,10 +931,28 @@ function addShelterMarkers() {
     popupContent.appendChild(typeDiv);
     popupContent.appendChild(metaDiv);
     popupContent.appendChild(btn);
-
     marker.bindPopup(popupContent);
     state.shelterMarkers[s.id] = marker;
   });
+}
+
+function rebuildAllMarkers() {
+  Object.values(state.shelterMarkers).forEach(m => map.removeLayer(m));
+  state.shelterMarkers = {};
+  addShelterMarkers();
+  if (state.userLatLng && state.userMarker) {
+    const [mLat, mLng] = applyCalibration(state.userLatLng.lat, state.userLatLng.lng);
+    state.userMarker.setLatLng([mLat, mLng]);
+    if (state.accuracyCircle) state.accuracyCircle.setLatLng([mLat, mLng]);
+  }
+  if (state.selectedShelter && state.userLatLng && state.routeLine) {
+    const sCoords = getShelterCoords(state.selectedShelter);
+    if (sCoords) {
+      const [uLat, uLng] = applyCalibration(state.userLatLng.lat, state.userLatLng.lng);
+      const [sLat, sLng] = applyCalibration(sCoords.lat, sCoords.lng);
+      state.routeLine.setLatLngs([[uLat, uLng], [sLat, sLng]]);
+    }
+  }
 }
 
 function selectShelterById(id) {
@@ -1031,19 +961,22 @@ function selectShelterById(id) {
 }
 
 // ============================================================
-// ВИБІР УКРИТТЯ ТА МАРШРУТ
+// ВИБІР УКРИТТЯ
 // ============================================================
 function selectShelter(shelter) {
   state.selectedShelter = shelter;
   haptic('medium');
   if (!state.userLatLng) { showToast(t('noGeo'), 2500, 'warning'); return; }
+  const sCoords = getShelterCoords(shelter);
+  if (!sCoords) { showToast('Координати недоступні', 2000, 'warning'); return; }
+
   routeLayer.clearLayers();
   const [uLat, uLng] = applyCalibration(state.userLatLng.lat, state.userLatLng.lng);
-  const [sLat, sLng] = applyCalibration(shelter.lat, shelter.lng);
+  const [sLat, sLng] = applyCalibration(sCoords.lat, sCoords.lng);
   state.routeLine = L.polyline([[uLat, uLng], [sLat, sLng]], {
     color: '#00FFB2', weight: 5, opacity: 0.9, dashArray: '12, 8', lineCap: 'round'
   }).addTo(routeLayer);
-  const d = map.distance([state.userLatLng.lat, state.userLatLng.lng], [shelter.lat, shelter.lng]);
+  const d = map.distance([state.userLatLng.lat, state.userLatLng.lng], [sCoords.lat, sCoords.lng]);
   updateHUD(d, shelter.name);
   map.fitBounds(state.routeLine.getBounds(), { padding: [80, 80] });
   closeShelterList();
@@ -1063,11 +996,8 @@ function updateHUD(distance, shelterName) {
 // ГЕОЛОКАЦІЯ
 // ============================================================
 function locateUser() {
-  if (!window.isSecureContext) {
-    showToast(t('iosGeoHint'), 5000, 'warning');
-    return;
-  }
-  if (!navigator.geolocation) { showToast('GPS not supported', 2500, 'error'); return; }
+  if (!window.isSecureContext) { showToast('Геолокація вимагає HTTPS', 5000, 'warning'); return; }
+  if (!navigator.geolocation) { showToast('GPS не підтримується', 2500, 'error'); return; }
   haptic('medium');
   showToast(t('locWait'), 2000);
   navigator.geolocation.getCurrentPosition(
@@ -1106,14 +1036,16 @@ function locateUser() {
 }
 
 // ============================================================
-// НАЙБЛИЖЧЕ УКРИТТЯ
+// НАЙБЛИЖЧЕ
 // ============================================================
 function findNearest() {
   if (!state.userLatLng) { showToast(t('noGeo'), 2500, 'warning'); locateUser(); return; }
   haptic('heavy');
   let nearest = null, minDist = Infinity;
   getAllShelters().forEach(s => {
-    const d = map.distance([state.userLatLng.lat, state.userLatLng.lng], [s.lat, s.lng]);
+    const coords = getShelterCoords(s);
+    if (!coords) return;
+    const d = map.distance([state.userLatLng.lat, state.userLatLng.lng], [coords.lat, coords.lng]);
     if (d < minDist) { minDist = d; nearest = s; }
   });
   if (nearest) {
@@ -1125,7 +1057,7 @@ function findNearest() {
 }
 
 // ============================================================
-// СПИСОК УКРИТТІВ
+// СПИСОК
 // ============================================================
 function openShelterList() {
   renderShelterList();
@@ -1138,12 +1070,16 @@ function closeShelterList() {
 function renderShelterList() {
   const list = document.getElementById('shelter-list');
   list.innerHTML = '';
-  let items = [...getAllShelters()];
+  let items = getAllShelters().map(s => {
+    const coords = getShelterCoords(s);
+    let distance = undefined;
+    if (state.userLatLng && coords) {
+      distance = map.distance([state.userLatLng.lat, state.userLatLng.lng], [coords.lat, coords.lng]);
+    }
+    return Object.assign({}, s, { distance });
+  });
   if (state.userLatLng) {
-    items = items.map(s => {
-      const d = map.distance([state.userLatLng.lat, state.userLatLng.lng], [s.lat, s.lng]);
-      return Object.assign({}, s, { distance: d });
-    }).sort((a, b) => a.distance - b.distance);
+    items.sort((a, b) => (a.distance === undefined ? Infinity : a.distance) - (b.distance === undefined ? Infinity : b.distance));
   }
   items.forEach(s => {
     const item = document.createElement('div');
@@ -1156,25 +1092,23 @@ function renderShelterList() {
       distText = s.distance < 1000 ? s.distance.toFixed(0) + ' м' : (s.distance / 1000).toFixed(2) + ' км';
     }
     const icon = iconFor(s.type);
-    const iconSvg = ICONS[icon.key];
     const metaParts = [s.type];
-    if (s.autoOpen) metaParts.push('<span class="auto-tag">' + t('autoTag') + '</span>');
+    if (s.autoOpen) metaParts.push(t('autoTag'));
     if (s.capacity && s.capacity > 0) metaParts.push(s.capacity + ' ' + t('capacityTag'));
 
     item.innerHTML =
-      '<div class="icon ' + icon.cls + '">' + iconSvg + '</div>' +
-      '<div class="info">' +
-        '<div class="name"></div>' +
-        '<div class="meta">' + metaParts.join(' · ') + '</div>' +
-      '</div>' +
+      '<div class="icon ' + icon.cls + '">' + ICONS[icon.key] + '</div>' +
+      '<div class="info"><div class="name"></div><div class="meta">' + metaParts.join(' · ') + '</div></div>' +
       '<div class="distance ' + distClass + '">' + distText + '</div>';
     item.querySelector('.name').textContent = s.name;
-
     item.addEventListener('click', () => {
-      map.setView([s.lat, s.lng], 17);
-      const marker = state.shelterMarkers[s.id];
-      if (marker) marker.openPopup();
-      selectShelter(s);
+      const coords = getShelterCoords(s);
+      if (coords) {
+        map.setView([coords.lat, coords.lng], 17);
+        const marker = state.shelterMarkers[s.id];
+        if (marker) marker.openPopup();
+        selectShelter(s);
+      }
       closeShelterList();
     });
     list.appendChild(item);
@@ -1182,7 +1116,7 @@ function renderShelterList() {
 }
 
 // ============================================================
-// ОЧИЩЕННЯ МАРШРУТУ
+// ОЧИЩЕННЯ / SOS
 // ============================================================
 function clearRoute() {
   routeLayer.clearLayers();
@@ -1194,17 +1128,13 @@ function clearRoute() {
   showToast(t('routeCleared'), 1500);
   haptic('medium');
 }
-
-// ============================================================
-// ЕКСТРЕНА ДОПОМОГА
-// ============================================================
 function callEmergency() {
   haptic('heavy');
   if (confirm(t('callConfirm'))) window.location.href = 'tel:101';
 }
 
 // ============================================================
-// РЕЖИМ ПЕРЕВІРКИ КООРДИНАТ
+// DEBUG MODE
 // ============================================================
 function toggleDebugMode() {
   state.debugMode = !state.debugMode;
@@ -1212,12 +1142,12 @@ function toggleDebugMode() {
   const btn = document.getElementById('btn-debug');
   if (btn) btn.classList.toggle('debug-active', state.debugMode);
   if (state.debugMode) {
-    showToast(t('debugOn'), 2500, 'info');
+    showToast('Торкніться карти, щоб побачити координати', 2500, 'info');
     map.on('click', onDebugClick);
   } else {
     map.off('click', onDebugClick);
     if (state.debugPopup) { map.closePopup(state.debugPopup); state.debugPopup = null; }
-    showToast(t('debugOff'), 1500);
+    showToast('Режим вимкнено', 1500);
   }
 }
 
@@ -1226,40 +1156,16 @@ function onDebugClick(e) {
   if (state.debugPopup) map.closePopup(state.debugPopup);
   const content = document.createElement('div');
   content.style.fontFamily = 'monospace';
-  content.style.fontSize = '0.8rem';
+  content.style.fontSize = '0.85rem';
   content.style.lineHeight = '1.6';
   content.style.color = '#fff';
-
-  const header = document.createElement('div');
-  header.style.color = '#3B82F6';
-  header.style.display = 'flex';
-  header.style.alignItems = 'center';
-  header.style.gap = '6px';
-  header.style.fontWeight = '800';
-  header.style.marginBottom = '6px';
-  header.innerHTML = ICONS.pin;
-  const headerSpan = document.createElement('span');
-  headerSpan.textContent = 'Coordinates';
-  header.appendChild(headerSpan);
-
-  const latLine = document.createElement('div');
-  latLine.textContent = 'lat: ' + lat.toFixed(6);
-  const lngLine = document.createElement('div');
-  lngLine.textContent = 'lng: ' + lng.toFixed(6);
-
+  content.innerHTML = '<div style="color:#3B82F6;font-weight:800;margin-bottom:6px;">Coordinates</div>' +
+    'lat: <b>' + lat.toFixed(6) + '</b><br>lng: <b>' + lng.toFixed(6) + '</b>';
   const copyBtn = document.createElement('button');
-  copyBtn.style.cssText = 'margin-top:8px;padding:6px 12px;background:#3B82F6;color:#fff;border:none;border-radius:8px;font-weight:bold;cursor:pointer;display:inline-flex;align-items:center;gap:6px;';
-  copyBtn.innerHTML = ICONS.copy;
-  const copySpan = document.createElement('span');
-  copySpan.textContent = t('copied');
-  copyBtn.appendChild(copySpan);
+  copyBtn.style.cssText = 'margin-top:8px;padding:6px 12px;background:#3B82F6;color:#fff;border:none;border-radius:8px;font-weight:bold;cursor:pointer;';
+  copyBtn.textContent = 'Копіювати';
   copyBtn.addEventListener('click', () => copyCoords(lat, lng));
-
-  content.appendChild(header);
-  content.appendChild(latLine);
-  content.appendChild(lngLine);
   content.appendChild(copyBtn);
-
   state.debugPopup = L.popup().setLatLng(e.latlng).setContent(content).openOn(map);
 }
 
@@ -1269,20 +1175,72 @@ function copyCoords(lat, lng) {
     navigator.clipboard.writeText(text).then(() => {
       showToast(t('copied') + ': ' + text, 2500, 'success');
       haptic('medium');
-    }).catch(() => prompt('Скопіюйте координати:', text));
+    }).catch(() => prompt('Координати:', text));
   } else {
-    prompt('Скопіюйте координати:', text);
+    prompt('Координати:', text);
   }
 }
 
 // ============================================================
-// ДОДАВАННЯ УКРИТТЯ (громадянська наука)
+// КАЛІБРУВАННЯ (UI)
+// ============================================================
+function openCalibrationModal() {
+  document.getElementById('calibration-modal').classList.add('active');
+  updateCalibrationDisplay();
+}
+function closeCalibrationModal() {
+  document.getElementById('calibration-modal').classList.remove('active');
+}
+function updateCalibrationDisplay() {
+  const el = document.getElementById('calibration-current');
+  const shift = offsetInMeters();
+  if (shift > 0) {
+    el.innerHTML = 'Активне калібрування<br>зсув ≈ <b style="color:#00FFB2;">' + shift + ' м</b>';
+    el.style.color = 'rgba(255,255,255,0.9)';
+    const btn = document.getElementById('btn-calibrate');
+    if (btn) btn.classList.add('debug-active');
+  } else {
+    el.textContent = 'Калібрування не активне';
+    el.style.color = 'rgba(255,255,255,0.6)';
+    const btn = document.getElementById('btn-calibrate');
+    if (btn) btn.classList.remove('debug-active');
+  }
+}
+function startCalibration() {
+  if (!state.userLatLng) { showToast(t('noGeo'), 2500, 'warning'); return; }
+  closeCalibrationModal();
+  state.calibrating = true;
+  showToast('Торкніться карти там, де ви ЗАРАЗ стоїте', 6000, 'info');
+  map.on('click', onCalibrationClick);
+  haptic('medium');
+}
+function onCalibrationClick(e) {
+  if (!state.calibrating) return;
+  state.calibration.dLat = e.latlng.lat - state.userLatLng.lat;
+  state.calibration.dLng = e.latlng.lng - state.userLatLng.lng;
+  saveCalibrationToStorage();
+  state.calibrating = false;
+  map.off('click', onCalibrationClick);
+  rebuildAllMarkers();
+  updateCalibrationDisplay();
+  showToast('Відкалібровано. Зсув ≈ ' + offsetInMeters() + ' м', 3500, 'success');
+  haptic('heavy');
+}
+function resetCalibration() {
+  state.calibration = { dLat: 0, dLng: 0 };
+  saveCalibrationToStorage();
+  rebuildAllMarkers();
+  updateCalibrationDisplay();
+  closeCalibrationModal();
+  showToast('Калібрування скинуто', 2000);
+}
+
+// ============================================================
+// ADD SHELTER
 // ============================================================
 function openAddModal() {
   haptic('light');
   document.getElementById('add-modal').classList.add('active');
-
-  // Спроба отримати координати з GPS або з центру карти
   if (state.userLatLng) {
     state.pendingCoords = { lat: state.userLatLng.lat, lng: state.userLatLng.lng };
     document.getElementById('add-coords-info').textContent = 'Координати: ' + state.userLatLng.lat.toFixed(6) + ', ' + state.userLatLng.lng.toFixed(6) + ' (з GPS)';
@@ -1291,25 +1249,22 @@ function openAddModal() {
     state.pendingCoords = { lat: c.lat, lng: c.lng };
     document.getElementById('add-coords-info').textContent = 'Координати: ' + c.lat.toFixed(6) + ', ' + c.lng.toFixed(6) + ' (центр карти)';
   }
-
   document.getElementById('add-name').value = '';
   document.getElementById('add-capacity').value = '';
   document.getElementById('add-notes').value = '';
 }
-
 function closeAddModal() {
   document.getElementById('add-modal').classList.remove('active');
   state.pendingCoords = null;
 }
-
 function saveNewShelter() {
   const name = document.getElementById('add-name').value.trim();
   if (!name) { showToast(t('addErrorName'), 2000, 'warning'); return; }
   if (!state.pendingCoords) { showToast('Немає координат', 2000, 'error'); return; }
-
   const newShelter = {
-    id: 10000 + state.userShelters.length,
+    id: 10000 + (state.userShelters.length || 0),
     name: name,
+    address: name,
     lat: state.pendingCoords.lat,
     lng: state.pendingCoords.lng,
     type: document.getElementById('add-type').value,
@@ -1318,8 +1273,8 @@ function saveNewShelter() {
     source: t('addedByUser'),
     notes: document.getElementById('add-notes').value.trim()
   };
-
   state.userShelters.push(newShelter);
+  state.geocoded[newShelter.id] = { lat: newShelter.lat, lng: newShelter.lng };
   saveUserShelters();
   rebuildAllMarkers();
   renderShelterList();
@@ -1327,7 +1282,6 @@ function saveNewShelter() {
   showToast(t('addSaved') + ': ' + name, 2500, 'success');
   haptic('heavy');
 }
-
 function saveUserShelters() {
   try { localStorage.setItem('safety_user_shelters_v1', JSON.stringify(state.userShelters)); } catch (e) {}
 }
@@ -1339,33 +1293,28 @@ function loadUserShelters() {
 }
 
 // ============================================================
-// ЕКСПОРТ ДАНИХ
+// EXPORT
 // ============================================================
 function exportCSV() {
   const items = getAllShelters();
   const headers = ['id', 'name', 'lat', 'lng', 'type', 'autoOpen', 'capacity', 'source'];
-  const rows = items.map(s => [
-    s.id,
-    '"' + (s.name || '').replace(/"/g, '""') + '"',
-    s.lat,
-    s.lng,
-    '"' + (s.type || '').replace(/"/g, '""') + '"',
-    s.autoOpen ? 'так' : 'ні',
-    s.capacity || 0,
-    '"' + (s.source || '').replace(/"/g, '""') + '"'
-  ].join(','));
-  const csv = headers.join(',') + '\n' + rows.join('\n');
-  downloadFile('shelters-chornomorsk.csv', csv, 'text/csv;charset=utf-8');
+  const rows = items.map(s => {
+    const c = getShelterCoords(s) || { lat: '', lng: '' };
+    return [s.id, '"' + (s.name || '').replace(/"/g, '""') + '"', c.lat, c.lng,
+      '"' + (s.type || '').replace(/"/g, '""') + '"', s.autoOpen ? 'так' : 'ні',
+      s.capacity || 0, '"' + (s.source || '').replace(/"/g, '""') + '"'].join(',');
+  });
+  downloadFile('shelters-chornomorsk.csv', headers.join(',') + '\n' + rows.join('\n'), 'text/csv;charset=utf-8');
   showToast(t('exported') + ': CSV (' + items.length + ')', 2000, 'success');
 }
-
 function exportJSON() {
-  const items = getAllShelters();
-  const json = JSON.stringify(items, null, 2);
-  downloadFile('shelters-chornomorsk.json', json, 'application/json;charset=utf-8');
+  const items = getAllShelters().map(s => {
+    const c = getShelterCoords(s) || {};
+    return Object.assign({}, s, { lat: c.lat, lng: c.lng });
+  });
+  downloadFile('shelters-chornomorsk.json', JSON.stringify(items, null, 2), 'application/json;charset=utf-8');
   showToast(t('exported') + ': JSON (' + items.length + ')', 2000, 'success');
 }
-
 function downloadFile(filename, content, mime) {
   const blob = new Blob(['\ufeff' + content], { type: mime });
   const url = URL.createObjectURL(blob);
@@ -1378,75 +1327,40 @@ function downloadFile(filename, content, mime) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+async function resetGeocode() {
+  if (!confirm('Оновити координати всіх укриттів? Це займе 1–2 хвилини.')) return;
+  try { localStorage.removeItem(GEOCODE_CACHE_KEY); } catch (e) {}
+  state.geocoded = {};
+  await geocodeAllShelters(true);
+  rebuildAllMarkers();
+  renderShelterList();
+  showToast(t('resetGeocode'), 2000, 'success');
+}
+
 // ============================================================
-// МОВА
+// МОДАЛЬНІ
 // ============================================================
+function openHelp() { document.getElementById('help-modal').classList.add('active'); }
+function closeHelp() { document.getElementById('help-modal').classList.remove('active'); }
+function openSafety() { document.getElementById('safety-modal').classList.add('active'); }
+function closeSafety() { document.getElementById('safety-modal').classList.remove('active'); }
 function toggleLang() {
   state.lang = state.lang === 'uk' ? 'en' : 'uk';
-  const L2 = lex[state.lang];
-  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-
-  set('panel-title', L2.panelTitle);
-  set('sos-label', L2.sosLabel);
-  set('help-title', L2.helpTitle);
-  set('btn-close-help', L2.helpClose);
-  set('safety-title', L2.safetyTitle);
-  set('btn-close-safety', L2.safetyClose);
-  set('add-title', L2.addTitle);
-  set('add-intro', L2.addIntro);
-  set('res-unit', L2.meters);
-  set('help-btn-label', state.lang === 'uk' ? 'Посібник' : 'Help');
-  set('safety-btn-label', state.lang === 'uk' ? 'Безпека' : 'Safety');
-
-  // Оновити індикатор шару
-  const indicatorText = document.getElementById('layer-indicator-text');
-  if (indicatorText) {
-    const labelKey = { hybrid: 'layerHybrid', streets: 'layerStreets', osm: 'layerOSM', sat: 'layerSat' }[state.currentLayer];
-    indicatorText.textContent = L2[labelKey];
-  }
-
   document.documentElement.lang = state.lang;
+  document.getElementById('res-unit').textContent = t('meters');
   renderShelterList();
-  updateCalibrationDisplay();
   haptic('light');
 }
 
 // ============================================================
-// МОДАЛЬНІ ВІКНА HELP/SAFETY
-// ============================================================
-function openHelp() { document.getElementById('help-modal').classList.add('active'); haptic('light'); }
-function closeHelp() { document.getElementById('help-modal').classList.remove('active'); haptic('light'); }
-function openSafety() { document.getElementById('safety-modal').classList.add('active'); haptic('light'); }
-function closeSafety() { document.getElementById('safety-modal').classList.remove('active'); haptic('light'); }
-
-// ============================================================
-// CANVAS
-// ============================================================
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
-function syncSize() {
-  canvas.width = innerWidth * devicePixelRatio;
-  canvas.height = innerHeight * devicePixelRatio;
-  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-}
-addEventListener('resize', syncSize);
-syncSize();
-
-// ============================================================
 // ІНІЦІАЛІЗАЦІЯ
 // ============================================================
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
   setTimeout(() => map.invalidateSize(), 300);
-
   loadCalibrationFromStorage();
   loadUserShelters();
-  addShelterMarkers();
-  updateCalibrationDisplay();
 
-  const indicatorText = document.getElementById('layer-indicator-text');
-  if (indicatorText) indicatorText.textContent = t('layerHybrid');
-
-  // Обробники подій
+  // Обробники
   document.getElementById('btn-help').addEventListener('click', openHelp);
   document.getElementById('btn-safety').addEventListener('click', openSafety);
   document.getElementById('btn-lang').addEventListener('click', toggleLang);
@@ -1469,31 +1383,49 @@ window.addEventListener('load', () => {
   document.getElementById('btn-close-calib').addEventListener('click', closeCalibrationModal);
   document.getElementById('btn-export-csv').addEventListener('click', exportCSV);
   document.getElementById('btn-export-json').addEventListener('click', exportJSON);
+  document.getElementById('btn-reset-geocode').addEventListener('click', resetGeocode);
   document.getElementById('btn-add-save').addEventListener('click', saveNewShelter);
   document.getElementById('btn-add-cancel').addEventListener('click', closeAddModal);
 
-  console.log('Curvimeter SAFETY v5.0 — Leaflet 1.9.4, science fields, citizen science mode');
+  // Геокодування — завантажити з кешу або зробити запити
+  const cache = loadGeocodeCache();
+  getAllShelters().forEach(s => {
+    if (cache[s.id]) state.geocoded[s.id] = cache[s.id];
+  });
+
+  // Якщо є некеровані — геокодувати
+  const needGeocode = getAllShelters().filter(s => !state.geocoded[s.id]);
+  if (needGeocode.length > 0) {
+    await geocodeAllShelters(false);
+  }
+
+  addShelterMarkers();
+  updateCalibrationDisplay();
+
+  // Автоматична геолокація при першому відкритті
+  if (state.userLatLng === null) {
+    setTimeout(() => {
+      if (navigator.geolocation && window.isSecureContext) locateUser();
+    }, 800);
+  }
+
+  console.log('Curvimeter SAFETY v6.0 — Nominatim geocoding, 53 shelters, ' + needGeocode.length + ' geocoded');
 });
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    closeHelp();
-    closeSafety();
-    closeShelterList();
-    closeAddModal();
+    closeHelp(); closeSafety(); closeShelterList(); closeAddModal();
     if (state.debugMode) toggleDebugMode();
     if (state.calibrating) {
       state.calibrating = false;
       map.off('click', onCalibrationClick);
-      showToast(t('calibCancelled'), 1500);
     }
     closeCalibrationModal();
   }
 });
 
-// Експорт функцій
 window.selectShelterById = selectShelterById;
 window.copyCoords = copyCoords;
 </script>
 </body>
-  </html>
+</html>
