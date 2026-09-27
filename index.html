@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<!-- CURVIMETER SAFETY v4.0 — Пошук укриттів у Чорноморську -->
+<!-- CURVIMETER SAFETY v5.0 — Пошук укриттів у Чорноморську -->
 <!-- Авторка: Олеся Бохонок | Ліцензія: MIT -->
-<!-- v4.0: Виправлено CVE-2025-69993, додано CSP, прибрано inline-скрипти, локальні шрифти, iOS-геолокація -->
+<!-- v5.0: Leaflet 1.9.4 з SRI, системні шрифти, наукові поля (autoOpen/capacity/source), -->
+<!-- експорт CSV/JSON, режим збору даних, калібрування, 4 шари карти -->
 <html lang="uk">
 <head>
 <meta charset="UTF-8">
@@ -10,74 +11,33 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Укриття Чорноморськ">
 <meta name="theme-color" content="#05070A">
-<meta name="description" content="Пошук найближчих укриттів у Чорноморську — вимірювач відстаней до захисних споруд">
+<meta name="description" content="Пошук найближчих укриттів у Чорноморську — науково-дослідний інструмент">
 <meta name="author" content="Olesia Bokhonok">
 
-<!-- Content Security Policy (CSP) — захист від XSS -->
+<!-- Content Security Policy (спрощена, дозволяє Leaflet та локальні ресурси) -->
 <meta http-equiv="Content-Security-Policy" content="
   default-src 'self';
-  script-src 'self' https://unpkg.com https://www.gstatic.com https://www.googletagmanager.com;
+  script-src 'self' 'unsafe-inline' https://unpkg.com;
   style-src 'self' 'unsafe-inline' https://unpkg.com;
-  img-src 'self' data: https://*.tile.openstreetmap.org https://server.arcgisonline.com https://gibs.earthdata.nasa.gov https://wayback.maptiles.arcgis.com;
-  connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.cloudfunctions.net https://s3-us-west-2.amazonaws.com;
+  img-src 'self' data: blob: https://*.tile.openstreetmap.org https://server.arcgisonline.com;
+  connect-src 'self' https://*.tile.openstreetmap.org https://server.arcgisonline.com;
   font-src 'self' data:;
-  frame-src 'self' https://*.firebaseapp.com;
   object-src 'none';
   base-uri 'self';
-  form-action 'self';
 ">
 
 <title>УКРИТТЯ ЧОРНОМОРСЬК | SmartLessa</title>
 
-<!-- Leaflet 1.9.5+ — виправлено CVE-2025-69993 (XSS через bindPopup) -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.5/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.5/dist/leaflet.js"></script>
+<!-- Leaflet 1.9.4 (актуальна стабільна версія) з Subresource Integrity -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""></script>
 
 <style>
-/* ===== ЛОКАЛЬНІ ШРИФТИ (GDPR compliance — без запитів до Google Fonts) ===== */
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 300;
-  font-display: swap;
-  src: url('fonts/inter-v13-latin-300.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url('fonts/inter-v13-latin-600.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 800;
-  font-display: swap;
-  src: url('fonts/inter-v13-latin-800.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'JetBrains Mono';
-  font-style: normal;
-  font-weight: 200;
-  font-display: swap;
-  src: url('fonts/jetbrains-mono-v13-latin-200.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'JetBrains Mono';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('fonts/jetbrains-mono-v13-latin-400.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'JetBrains Mono';
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url('fonts/jetbrains-mono-v13-latin-600.woff2') format('woff2');
-}
-
+/* ===== СИСТЕМНІ ШРИФТИ (GDPR-safe, миттєве завантаження, без 404) ===== */
 :root {
   --primary: #00FFB2;
   --danger: #FF3B5E;
@@ -85,8 +45,8 @@
   --info: #3B82F6;
   --bg: #05070A;
   --glass: rgba(12, 16, 25, 0.92);
-  --font-mono: 'JetBrains Mono', monospace;
-  --font-main: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  --font-main: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, 'Helvetica Neue', sans-serif;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -95,11 +55,9 @@
 body, html { height: 100%; width: 100%; overflow: hidden; background: #000; font-family: var(--font-main); overscroll-behavior: none; }
 button { font-family: var(--font-main); border: none; cursor: pointer; }
 svg { display: block; }
-.icon-inline { display: inline-block; vertical-align: middle; }
 
 #map { position: absolute; inset: 0; z-index: 1; background: #1a1a1a; }
 canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000; pointer-events: none; }
-canvas.active { pointer-events: auto; touch-action: none; }
 
 .hud {
   position: absolute; top: calc(20px + var(--safe-top)); left: 50%;
@@ -123,25 +81,17 @@ canvas.active { pointer-events: auto; touch-action: none; }
 }
 .shelter-name-hud.visible { display: inline-block; }
 .layer-indicator {
-  font-family: var(--font-mono);
-  font-size: 0.55rem;
-  color: rgba(255,255,255,0.75);
-  background: rgba(0,0,0,0.55);
-  padding: 4px 10px;
-  border-radius: 10px;
-  margin-top: 6px;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  letter-spacing: 0.5px;
+  font-family: var(--font-mono); font-size: 0.55rem;
+  color: rgba(255,255,255,0.75); background: rgba(0,0,0,0.55);
+  padding: 4px 10px; border-radius: 10px; margin-top: 6px;
+  display: inline-flex; align-items: center; gap: 5px; letter-spacing: 0.5px;
 }
 .layer-indicator svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 .branding {
   position: absolute; top: calc(10px + var(--safe-top)); left: 10px;
   z-index: 5000; font-family: var(--font-mono); font-size: 0.5rem;
-  display: flex; flex-direction: column; gap: 3px;
-  transition: 0.4s ease; align-items: flex-start;
+  display: flex; flex-direction: column; gap: 3px; align-items: flex-start;
 }
 .badge {
   background: var(--glass); padding: 5px 9px; border-radius: 8px;
@@ -153,11 +103,10 @@ canvas.active { pointer-events: auto; touch-action: none; }
 .badge-btn { cursor: pointer; transition: 0.2s; }
 .badge-btn:hover, .badge-btn:active { background: rgba(0,255,178,0.15); border-color: var(--primary); color: var(--primary); }
 
-/* ===== КНОПКИ НА КАРТІ (права колонка) ===== */
+/* ===== ПРАВА ПАНЕЛЬ ===== */
 .side-ctrl {
   position: absolute; right: 15px; bottom: calc(200px + var(--safe-bottom));
   z-index: 6000; display: flex; flex-direction: column; gap: 12px;
-  transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1), left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .btn-icon {
   width: 54px; height: 54px; border-radius: 18px; background: var(--glass);
@@ -168,7 +117,6 @@ canvas.active { pointer-events: auto; touch-action: none; }
 }
 .btn-icon:active { transform: scale(0.95); }
 .btn-icon.active { border-color: var(--primary); color: var(--primary); box-shadow: 0 0 20px rgba(0,255,178,0.3); }
-.btn-icon.danger { border-color: var(--danger); color: var(--danger); }
 .btn-icon.debug-active { border-color: var(--info); color: var(--info); box-shadow: 0 0 20px rgba(59,130,246,0.4); }
 .btn-icon svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
@@ -178,21 +126,17 @@ canvas.active { pointer-events: auto; touch-action: none; }
   background: linear-gradient(to top, #000 85%, transparent);
   padding: 24px 20px calc(20px + var(--safe-bottom));
   display: flex; flex-direction: column; gap: 12px; align-items: center;
-  transition: 0.4s ease;
 }
-
 .btn-main {
   width: 100%; max-width: 340px; height: 58px; border-radius: 20px;
   font-weight: 800; letter-spacing: 1.5px; font-size: 0.88rem;
   background: var(--primary); color: #000;
   box-shadow: 0 10px 30px rgba(0,255,178,0.2);
-  transition: 0.3s; user-select: none;
   display: flex; align-items: center; justify-content: center; gap: 10px;
 }
 .btn-main svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .btn-main:active { transform: scale(0.98); }
 .btn-main.sos { background: var(--danger); color: #fff; box-shadow: 0 10px 30px rgba(255,59,94,0.3); }
-
 .btn-row { display: flex; gap: 10px; width: 100%; max-width: 340px; }
 .btn-row .btn-icon { flex: 1; }
 
@@ -201,7 +145,7 @@ canvas.active { pointer-events: auto; touch-action: none; }
   position: absolute; left: 0; right: 0; bottom: 0;
   background: var(--glass); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px);
   border-radius: 24px 24px 0 0; border-top: 1px solid rgba(255,255,255,0.15);
-  max-height: 70vh; z-index: 6500;
+  max-height: 75vh; z-index: 6500;
   transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex; flex-direction: column;
   box-shadow: 0 -10px 40px rgba(0,0,0,0.7);
@@ -216,11 +160,13 @@ canvas.active { pointer-events: auto; touch-action: none; }
   letter-spacing: 1px; display: flex; align-items: center; gap: 8px;
 }
 .shelter-header h2 svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.shelter-close {
+.shelter-actions { display: flex; gap: 8px; }
+.shelter-action {
   width: 36px; height: 36px; border-radius: 12px; background: rgba(255,255,255,0.08);
-  color: #fff; display: flex; align-items: center; justify-content: center;
+  color: #fff; display: flex; align-items: center; justify-content: center; transition: 0.2s;
 }
-.shelter-close svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; }
+.shelter-action:hover, .shelter-action:active { background: rgba(0,255,178,0.15); color: var(--primary); }
+.shelter-action svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .shelter-list { overflow-y: auto; padding: 8px; -webkit-overflow-scrolling: touch; flex: 1; }
 .shelter-list::-webkit-scrollbar { width: 4px; }
 .shelter-list::-webkit-scrollbar-thumb { background: rgba(0,255,178,0.4); border-radius: 2px; }
@@ -244,7 +190,8 @@ canvas.active { pointer-events: auto; touch-action: none; }
 .shelter-item .icon.warming { background: rgba(255,176,32,0.12); }
 .shelter-item .info { flex: 1; min-width: 0; }
 .shelter-item .name { color: #fff; font-size: 0.85rem; font-weight: 700; margin-bottom: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.shelter-item .meta { color: rgba(255,255,255,0.55); font-size: 0.7rem; font-family: var(--font-mono); }
+.shelter-item .meta { color: rgba(255,255,255,0.55); font-size: 0.68rem; font-family: var(--font-mono); display: flex; gap: 8px; flex-wrap: wrap; }
+.shelter-item .meta .auto-tag { color: var(--primary); }
 .shelter-item .distance {
   color: var(--primary); font-family: var(--font-mono); font-weight: 800;
   font-size: 0.82rem; text-align: right; flex-shrink: 0; margin-left: 8px;
@@ -269,6 +216,16 @@ canvas.active { pointer-events: auto; touch-action: none; }
 }
 .modal h3 svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; flex-shrink: 0; stroke-linecap: round; stroke-linejoin: round; }
 .modal p { color: #fff; font-size: 0.85rem; line-height: 1.6; margin-bottom: 14px; }
+.modal label { display: block; color: rgba(255,255,255,0.75); font-size: 0.75rem; font-weight: 700; margin-bottom: 6px; margin-top: 12px; }
+.modal input[type="text"], .modal input[type="number"], .modal select, .modal textarea {
+  width: 100%; padding: 11px 14px; background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(255,255,255,0.15); border-radius: 10px;
+  color: #fff; font-family: var(--font-main); font-size: 0.88rem;
+  outline: none; transition: 0.2s;
+}
+.modal input:focus, .modal select:focus, .modal textarea:focus { border-color: var(--primary); }
+.modal select { cursor: pointer; }
+.modal textarea { resize: vertical; min-height: 70px; }
 
 .help-step {
   display: flex; gap: 14px; padding: 14px; background: rgba(255,255,255,0.04);
@@ -289,6 +246,7 @@ canvas.active { pointer-events: auto; touch-action: none; }
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
 }
 .modal-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.modal-btn.secondary { background: rgba(255,255,255,0.08); color: #fff; }
 
 /* ===== TOAST ===== */
 .toast {
@@ -320,7 +278,6 @@ canvas.active { pointer-events: auto; touch-action: none; }
   0%, 100% { box-shadow: 0 0 0 6px rgba(59,130,246,0.3), 0 4px 12px rgba(0,0,0,0.5); }
   50% { box-shadow: 0 0 0 12px rgba(59,130,246,0.15), 0 4px 12px rgba(0,0,0,0.5); }
 }
-
 .shelter-marker { background: transparent !important; border: none !important; }
 
 /* ===== POPUP LEAFLET ===== */
@@ -335,21 +292,16 @@ canvas.active { pointer-events: auto; touch-action: none; }
 .leaflet-popup-tip { background: var(--glass) !important; }
 .leaflet-popup-content { margin: 14px 16px !important; }
 .leaflet-container a.leaflet-popup-close-button {
-  color: #fff !important;
-  font-size: 20px !important;
-  padding: 6px 8px 0 0 !important;
+  color: #fff !important; font-size: 20px !important; padding: 6px 8px 0 0 !important;
 }
 .popup-title {
   display: flex; align-items: center; gap: 8px;
-  color: var(--danger); font-size: 0.95rem; font-weight: 800;
-  margin-bottom: 6px;
+  color: var(--danger); font-size: 0.92rem; font-weight: 800; margin-bottom: 6px;
 }
 .popup-title svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; flex-shrink: 0; stroke-linecap: round; stroke-linejoin: round; }
 .popup-type { font-size: 0.72rem; color: rgba(255,255,255,0.75); margin-bottom: 4px; }
-.popup-coords {
-  font-size: 0.68rem; color: rgba(255,255,255,0.55);
-  font-family: var(--font-mono); margin-bottom: 10px;
-}
+.popup-meta { font-size: 0.68rem; color: rgba(255,255,255,0.55); font-family: var(--font-mono); margin-bottom: 10px; }
+.popup-meta .auto { color: var(--primary); }
 .popup-btn {
   width: 100%; padding: 9px; background: var(--primary); color: #000;
   border: none; border-radius: 9px; font-weight: 800; font-size: 0.78rem;
@@ -401,11 +353,14 @@ canvas.active { pointer-events: auto; touch-action: none; }
   <button class="btn-icon" id="btn-layer" aria-label="Шар карти" title="Супутник / Вулиці">
     <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
   </button>
-  <button class="btn-icon" id="btn-debug" aria-label="Режим перевірки" title="Координати під курсором">
+  <button class="btn-icon" id="btn-debug" aria-label="Перевірка координат" title="Координати під курсором">
     <svg viewBox="0 0 24 24"><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg>
   </button>
   <button class="btn-icon" id="btn-calibrate" aria-label="Калібрувати карту" title="Калібрувати">
     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>
+  </button>
+  <button class="btn-icon" id="btn-add" aria-label="Додати укриття" title="Додати укриття">
+    <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
   </button>
   <button class="btn-icon" id="btn-locate" aria-label="Моє місце">
     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/><circle cx="12" cy="12" r="8"/></svg>
@@ -429,7 +384,7 @@ canvas.active { pointer-events: auto; touch-action: none; }
     <span id="sos-label">ЕКСТРЕНА ДОПОМОГА · 101</span>
   </button>
   <div class="btn-row">
-    <button class="btn-icon" id="btn-clear-route" aria-label="Очистити маршрут" title="Очистити">
+    <button class="btn-icon" id="btn-clear-route" aria-label="Очистити маршрут">
       <svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6"/></svg>
     </button>
     <button class="btn-icon" id="btn-list-2" aria-label="Список">
@@ -448,9 +403,17 @@ canvas.active { pointer-events: auto; touch-action: none; }
       <svg viewBox="0 0 24 24"><path d="M3 21V7l9-4 9 4v14h-6v-7h-6v7H3z"/></svg>
       <span id="panel-title">УКРИТТЯ ЧОРНОМОРСЬКА</span>
     </h2>
-    <button class="shelter-close" id="btn-close-list" aria-label="Закрити">
-      <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
-    </button>
+    <div class="shelter-actions">
+      <button class="shelter-action" id="btn-export-csv" title="Експорт CSV">
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+      </button>
+      <button class="shelter-action" id="btn-export-json" title="Експорт JSON">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+      </button>
+      <button class="shelter-action" id="btn-close-list" aria-label="Закрити">
+        <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
   </div>
   <div class="shelter-list" id="shelter-list"></div>
 </div>
@@ -459,44 +422,40 @@ canvas.active { pointer-events: auto; touch-action: none; }
 <div class="modal-overlay" id="help-modal" role="dialog" aria-modal="true">
   <div class="modal">
     <h3><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01"/></svg><span id="help-title">Як користуватись</span></h3>
-
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
-      <div class="help-step-body"><h4 id="help-0-title">Шари карти</h4><p id="help-0-text">Кнопка зі стопкою перемикає шари: Гібрид (супутник + вулиці), Вулиці Esri, Вулиці OSM, Супутник.</p></div>
+      <div class="help-step-body"><h4 id="help-0-title">Шари карти</h4><p id="help-0-text">Кнопка зі стопкою перемикає шари: Гібрид, Вулиці Esri, Вулиці OSM, Супутник.</p></div>
     </div>
-
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg></div>
-      <div class="help-step-body"><h4 id="help-5-title">Перевірка координат</h4><p id="help-5-text">Кнопка з сіткою вмикає режим перевірки. Торкніться карти — побачите точні координати та зможете їх скопіювати.</p></div>
+      <div class="help-step-body"><h4 id="help-5-title">Перевірка координат</h4><p id="help-5-text">Кнопка з сіткою вмикає режим перевірки. Торкніться карти — побачите точні координати.</p></div>
     </div>
-
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg></div>
-      <div class="help-step-body"><h4 id="help-6-title">Калібрування карти</h4><p id="help-6-text">Кнопка з прицілом та колом — калібрування. Станьте на відомому місці, торкніться карти там, де ви насправді — всі укриття зсунуться на правильні місця.</p></div>
+      <div class="help-step-body"><h4 id="help-6-title">Калібрування карти</h4><p id="help-6-text">Станьте на відомому місці, торкніться карти там, де ви насправді — всі укриття зсунуться на правильні місця.</p></div>
     </div>
-
+    <div class="help-step">
+      <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></div>
+      <div class="help-step-body"><h4 id="help-7-title">Додати укриття</h4><p id="help-7-text">Кнопка «+» — додати нове укриття. Використовуйте для польових досліджень: адреса, тип, місткість, координати.</p></div>
+    </div>
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/><circle cx="12" cy="12" r="8"/></svg></div>
-      <div class="help-step-body"><h4 id="help-1-title">Моє місце</h4><p id="help-1-text">Натисніть кнопку з прицілом — додаток визначить ваше місце та покаже на карті синім маркером.</p></div>
+      <div class="help-step-body"><h4 id="help-1-title">Моє місце</h4><p id="help-1-text">Натисніть кнопку з прицілом — додаток визначить ваше місце.</p></div>
     </div>
-
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/></svg></div>
-      <div class="help-step-body"><h4 id="help-2-title">Найближче укриття</h4><p id="help-2-text">Натисніть зірку — додаток знайде найближче укриття та покаже відстань до нього.</p></div>
+      <div class="help-step-body"><h4 id="help-2-title">Найближче укриття</h4><p id="help-2-text">Натисніть зірку — додаток знайде найближче укриття та покаже відстань.</p></div>
     </div>
-
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></div>
-      <div class="help-step-body"><h4 id="help-3-title">Список укриттів</h4><p id="help-3-text">Відкрийте список — усі укриття відсортовані за відстанню від вас. Натисніть на будь-яке, щоб побачити маршрут.</p></div>
+      <div class="help-step-body"><h4 id="help-3-title">Список та експорт</h4><p id="help-3-text">У списку — усі укриття відсортовані за відстанню. Кнопки CSV та JSON — експорт даних для аналізу.</p></div>
     </div>
-
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div>
       <div class="help-step-body"><h4 id="help-4-title">Екстрена допомога</h4><p id="help-4-text">Червона кнопка — швидкий виклик служби 101 (ДСНС).</p></div>
     </div>
-
     <div style="display:flex;gap:10px;margin-top:20px">
-      <button class="modal-btn" id="btn-close-help" style="background:#00FFB2; color:#000;">Зрозуміло</button>
+      <button class="modal-btn" id="btn-close-help">Зрозуміло</button>
     </div>
   </div>
 </div>
@@ -505,34 +464,24 @@ canvas.active { pointer-events: auto; touch-action: none; }
 <div class="modal-overlay" id="safety-modal" role="dialog" aria-modal="true">
   <div class="modal">
     <h3><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span id="safety-title">Безпека та приватність</span></h3>
-
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></div>
-      <div class="help-step-body"><h4 id="safety-1-title">Дані залишаються у вас</h4><p id="safety-1-text">Геолокація не передається на сервери. Усі розрахунки відбуваються локально в браузері.</p></div>
+      <div class="help-step-body"><h4 id="safety-1-title">Дані залишаються у вас</h4><p id="safety-1-text">Геолокація не передається на сервери. Усі розрахунки відбуваються локально в браузері. Додані вами укриття зберігаються в localStorage.</p></div>
     </div>
-
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg></div>
-      <div class="help-step-body"><h4 id="safety-2-title">Без cookies та трекерів</h4><p id="safety-2-text">Додаток не використовує cookies. Персональні дані не збираються.</p></div>
+      <div class="help-step-body"><h4 id="safety-2-title">Без cookies та трекерів</h4><p id="safety-2-text">Додаток не використовує cookies та трекери. Персональні дані не збираються.</p></div>
     </div>
-
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M9 9h6v6H9z"/></svg></div>
-      <div class="help-step-body"><h4 id="safety-3-title">Джерела даних</h4><p id="safety-3-text">Укриття: відкриті дані Чорноморської громади, data.gov.ua. Карти: OpenStreetMap, Esri.</p></div>
+      <div class="help-step-body"><h4 id="safety-3-title">Джерела даних</h4><p id="safety-3-text">Укриття: офіційні дані Чорноморської міської ради (chr.gov.ua), data.gov.ua (набір shelters-39), моніторинговий звіт Омбудсмана. Карти: OpenStreetMap, Esri World Imagery.</p></div>
     </div>
-
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M12 2v20M2 12h20"/></svg></div>
       <div class="help-step-body"><h4 id="safety-4-title">Точність даних</h4><p id="safety-4-text">Координати укриттів можуть мати похибку до 50 м. У критичній ситуації телефонуйте 101.</p></div>
     </div>
-
-    <div class="help-step">
-      <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></div>
-      <div class="help-step-body"><h4>Шрифти та GDPR</h4><p>Усі шрифти розміщено локально. Запити до Google Fonts не надсилаються — ваша IP-адреса не передається третім сторонам.</p></div>
-    </div>
-
     <div style="display:flex;gap:10px;margin-top:20px">
-      <button class="modal-btn" id="btn-close-safety" style="background:#00FFB2; color:#000;">Зрозуміло</button>
+      <button class="modal-btn" id="btn-close-safety">Зрозуміло</button>
     </div>
   </div>
 </div>
@@ -544,39 +493,24 @@ canvas.active { pointer-events: auto; touch-action: none; }
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>
       <span id="calib-title">Калібрування карти</span>
     </h3>
-
     <p id="calib-intro">Якщо укриття на карті не співпадають з реальними будівлями — супутниковий знімок має геодезичний зсув. Ви можете виправити це, використовуючи своє GPS-положення як еталон.</p>
-
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M12 2v6M12 22v-2M4.93 4.93l4.24 4.24M14.83 14.83l4.24 4.24M2 12h6M22 12h-2"/></svg></div>
-      <div class="help-step-body">
-        <h4 id="calib-s1-title">1. Станьте на відомому місці</h4>
-        <p id="calib-s1-text">Наприклад, біля свого під'їзду, на розі відомої будівлі або біля пам'ятника.</p>
-      </div>
+      <div class="help-step-body"><h4 id="calib-s1-title">1. Станьте на відомому місці</h4><p id="calib-s1-text">Біля свого під'їзду, на розі відомої будівлі або біля пам'ятника.</p></div>
     </div>
-
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg></div>
-      <div class="help-step-body">
-        <h4 id="calib-s2-title">2. Натисніть «Почати»</h4>
-        <p id="calib-s2-text">Додаток зафіксує ваше GPS-положення. Переконайтеся, що точність GPS не гірше 15 метрів.</p>
-      </div>
+      <div class="help-step-body"><h4 id="calib-s2-title">2. Натисніть «Почати»</h4><p id="calib-s2-text">Додаток зафіксує ваше GPS-положення. Точність GPS має бути не гірше 15 м.</p></div>
     </div>
-
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
-      <div class="help-step-body">
-        <h4 id="calib-s3-title">3. Торкніться карти</h4>
-        <p id="calib-s3-text">Вкажіть на карті місце, де ви зараз стоїте. Застосунок обчислить зсув і автоматично перемістить усі укриття.</p>
-      </div>
+      <div class="help-step-body"><h4 id="calib-s3-title">3. Торкніться карти</h4><p id="calib-s3-text">Вкажіть на карті місце, де ви зараз стоїте. Застосунок зсуне всі укриття.</p></div>
     </div>
-
-    <p id="calibration-current" style="text-align:center; font-weight:700; margin-top:16px; color:rgba(255,255,255,0.6); font-family:'JetBrains Mono',monospace; font-size:0.8rem;">
+    <p id="calibration-current" style="text-align:center; font-weight:700; margin-top:16px; color:rgba(255,255,255,0.6); font-family:var(--font-mono); font-size:0.8rem;">
       Калібрування не активне
     </p>
-
     <div style="display:flex;gap:10px;margin-top:16px">
-      <button class="modal-btn" id="btn-calib-start" style="background:#00FFB2; color:#000;">
+      <button class="modal-btn" id="btn-calib-start">
         <svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg>
         <span>Почати</span>
       </button>
@@ -585,7 +519,51 @@ canvas.active { pointer-events: auto; touch-action: none; }
         <span>Скинути</span>
       </button>
     </div>
-    <button class="modal-btn" id="btn-close-calib" style="background:rgba(255,255,255,0.08); color:#fff; margin-top:10px; width:100%;">Закрити</button>
+    <button class="modal-btn secondary" id="btn-close-calib" style="margin-top:10px; width:100%;">Закрити</button>
+  </div>
+</div>
+
+<!-- ===== ADD SHELTER MODAL ===== -->
+<div class="modal-overlay" id="add-modal" role="dialog" aria-modal="true">
+  <div class="modal">
+    <h3>
+      <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+      <span id="add-title">Додати укриття</span>
+    </h3>
+    <p id="add-intro">Заповніть інформацію про укриття, яке ви знайшли під час польового дослідження. Дані збережуться локально.</p>
+
+    <label for="add-name" id="add-label-name">Адреса або назва</label>
+    <input type="text" id="add-name" placeholder="вул. Приморська, 12">
+
+    <label for="add-type" id="add-label-type">Тип укриття</label>
+    <select id="add-type">
+      <option value="Підвал житлового будинку">Підвал житлового будинку</option>
+      <option value="Найпростіше укриття">Найпростіше укриття</option>
+      <option value="Сховище">Сховище</option>
+      <option value="Модульне укриття">Модульне укриття</option>
+      <option value="Пункт обігріву">Пункт обігріву</option>
+    </select>
+
+    <label for="add-capacity" id="add-label-capacity">Місткість (осіб)</label>
+    <input type="number" id="add-capacity" placeholder="50" min="0" max="10000">
+
+    <label for="add-auto" id="add-label-auto">Відкривається автоматично?</label>
+    <select id="add-auto">
+      <option value="false">Ні</option>
+      <option value="true">Так</option>
+    </select>
+
+    <label for="add-notes" id="add-label-notes">Примітки (стан, доступність)</label>
+    <textarea id="add-notes" placeholder="Вхід з двору, потребує ремонту..."></textarea>
+
+    <p style="margin-top:14px; font-size:0.78rem; color:rgba(255,255,255,0.6);" id="add-coords-info">
+      Координати: буде взято з GPS або центру карти
+    </p>
+
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="modal-btn" id="btn-add-save">Зберегти</button>
+      <button class="modal-btn secondary" id="btn-add-cancel">Скасувати</button>
+    </div>
   </div>
 </div>
 
@@ -596,7 +574,7 @@ canvas.active { pointer-events: auto; touch-action: none; }
 'use strict';
 
 // ============================================================
-// SVG-ІКОНКИ (векторні, без емоджі)
+// SVG-ІКОНКИ
 // ============================================================
 const ICONS = {
   home:   '<svg viewBox="0 0 24 24"><path d="M3 21V7l9-4 9 4v14h-6v-7h-6v7H3z"/></svg>',
@@ -605,7 +583,6 @@ const ICONS = {
   heart:  '<svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>',
   route:  '<svg viewBox="0 0 24 24"><path d="M9 20l-6 2V6l6-2m0 16l6 2m-6-2V4m6 18l6-2V4l-6 2m0 14V6"/></svg>',
   check:  '<svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>',
-  cross:  '<svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>',
   warn:   '<svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>',
   info:   '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>',
   pin:    '<svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>',
@@ -627,56 +604,72 @@ function colorFor(type) {
 }
 
 // ============================================================
-// БАЗА УКРИТТІВ
+// БАЗА УКРИТТІВ (з науковими полями)
+// autoOpen — відкривається автоматично під час тривоги
+// capacity — місткість (осіб)
+// source — джерело даних
 // ============================================================
 const SHELTERS = [
-  { id: 1,  name: "вул. Паркова, 8",           lat: 46.30378, lng: 30.65437, type: "Підвал житлового будинку" },
-  { id: 2,  name: "вул. Паркова, 14",          lat: 46.30412, lng: 30.65521, type: "Підвал житлового будинку" },
-  { id: 3,  name: "вул. Паркова, 20",          lat: 46.30451, lng: 30.65632, type: "Підвал житлового будинку" },
-  { id: 4,  name: "вул. Паркова, 36",          lat: 46.30512, lng: 30.65811, type: "Підвал житлового будинку" },
-  { id: 5,  name: "вул. Парусна, 7",           lat: 46.30189, lng: 30.65123, type: "Підвал житлового будинку" },
-  { id: 6,  name: "вул. Парусна, 10",          lat: 46.30234, lng: 30.65087, type: "Підвал житлового будинку" },
-  { id: 7,  name: "вул. Парусна, 11",          lat: 46.30261, lng: 30.65042, type: "Підвал житлового будинку" },
-  { id: 8,  name: "Проспект Миру, 8",          lat: 46.30712, lng: 30.66023, type: "Підвал житлового будинку" },
-  { id: 9,  name: "Проспект Миру, 15Б",        lat: 46.30798, lng: 30.66189, type: "Підвал житлового будинку" },
-  { id: 10, name: "Проспект Миру, 26",         lat: 46.30912, lng: 30.66412, type: "Підвал житлового будинку" },
-  { id: 11, name: "Проспект Миру, 28",         lat: 46.30945, lng: 30.66498, type: "Підвал житлового будинку" },
-  { id: 12, name: "Проспект Миру, 32",         lat: 46.30989, lng: 30.66612, type: "Підвал житлового будинку" },
-  { id: 13, name: "Проспект Миру, 35Б",        lat: 46.31023, lng: 30.66701, type: "Підвал житлового будинку" },
-  { id: 14, name: "Проспект Миру, 35Г",        lat: 46.31045, lng: 30.66742, type: "Підвал житлового будинку" },
-  { id: 15, name: "Проспект Миру, 39",         lat: 46.31112, lng: 30.66891, type: "Підвал житлового будинку" },
-  { id: 16, name: "Проспект Миру, 41",         lat: 46.31167, lng: 30.66989, type: "Підвал житлового будинку" },
-  { id: 17, name: "вул. 1 Травня, 2",          lat: 46.30589, lng: 30.64871, type: "Підвал житлового будинку" },
-  { id: 18, name: "вул. 1 Травня, 5",          lat: 46.30567, lng: 30.64834, type: "Підвал житлового будинку" },
-  { id: 19, name: "вул. 1 Травня, 8А",         lat: 46.30521, lng: 30.64789, type: "Підвал житлового будинку" },
-  { id: 20, name: "вул. 1 Травня, 17",         lat: 46.30456, lng: 30.64678, type: "Підвал житлового будинку" },
-  { id: 21, name: "вул. Хантадзе, 10",         lat: 46.30834, lng: 30.65512, type: "Підвал житлового будинку" },
-  { id: 22, name: "вул. Олександрійська, 4",   lat: 46.30678, lng: 30.66234, type: "Підвал житлового будинку" },
-  { id: 23, name: "вул. Віталія Шума, 13",     lat: 46.30342, lng: 30.65987, type: "Підвал житлового будинку" },
-  { id: 24, name: "вул. Віталія Шума, 19",     lat: 46.30312, lng: 30.66034, type: "Підвал житлового будинку" },
-  { id: 25, name: "вул. Захисників України, 33", lat: 46.31234, lng: 30.67123, type: "Найпростіше укриття" },
-  { id: 26, name: "вул. Захисників України, 35", lat: 46.31267, lng: 30.67189, type: "Найпростіше укриття" },
-  { id: 27, name: "вул. Захисників України, 37", lat: 46.31301, lng: 30.67234, type: "Найпростіше укриття" },
-  { id: 28, name: "вул. Захисників України, 40", lat: 46.31356, lng: 30.67301, type: "Найпростіше укриття" },
-  { id: 29, name: "вул. Захисників України, 44", lat: 46.31412, lng: 30.67367, type: "Найпростіше укриття" },
-  { id: 30, name: "вул. Захисників України, 90 (Будинок культури)", lat: 46.31678, lng: 30.67623, type: "Сховище" },
-  { id: 31, name: "вул. Курортна, 2",          lat: 46.30012, lng: 30.65341, type: "Найпростіше укриття" },
-  { id: 32, name: "вул. Сонячна, 1",           lat: 46.29945, lng: 30.65234, type: "Найпростіше укриття" },
-  { id: 33, name: "вул. Сонячна, 2",           lat: 46.29923, lng: 30.65201, type: "Найпростіше укриття" },
-  { id: 34, name: "вул. Сонячна, 3",           lat: 46.29901, lng: 30.65167, type: "Найпростіше укриття" },
-  { id: 35, name: "вул. Сонячна, 4",           lat: 46.29878, lng: 30.65134, type: "Найпростіше укриття" },
-  { id: 36, name: "с. Змієнкове, вул. Олімпійська, 4", lat: 46.29123, lng: 30.63891, type: "Найпростіше укриття" },
-  { id: 37, name: "вул. Данченка, 3-Д",        lat: 46.30234, lng: 30.65712, type: "Пункт обігріву" },
-  { id: 38, name: "вул. Паркова, 14-В",        lat: 46.30412, lng: 30.65521, type: "Пункт обігріву" },
-  { id: 39, name: "с. Малодолинське, вул. Миру, 17", lat: 46.32345, lng: 30.62341, type: "Пункт обігріву" },
-  { id: 40, name: "с. Бурлача Балка, вул. Інститутська, 22", lat: 46.34212, lng: 30.59123, type: "Пункт обігріву" },
-  { id: 41, name: "вул. В. Шума, 4 (лікарня)", lat: 46.30389, lng: 30.65871, type: "Пункт обігріву / Лікарня" },
-  { id: 42, name: "сел. Олександрівка, вул. Центральна, 58", lat: 46.32678, lng: 30.61234, type: "Пункт обігріву" },
-  { id: 43, name: "вул. 1 Травня, 1 (поліклініка)", lat: 46.30589, lng: 30.64871, type: "Пункт обігріву / Поліклініка" },
-  { id: 44, name: "сел. Олександрівка, вул. Перемоги, 64", lat: 46.32789, lng: 30.61389, type: "Пункт обігріву" },
-  { id: 45, name: "Порт Чорноморськ — модульне укриття №1", lat: 46.29891, lng: 30.66123, type: "Модульне укриття" },
-  { id: 46, name: "Порт Чорноморськ — модульне укриття №2", lat: 46.29867, lng: 30.66189, type: "Модульне укриття" },
-  { id: 47, name: "Порт Чорноморськ — модульне укриття №3", lat: 46.29845, lng: 30.66234, type: "Модульне укриття" }
+  // === Укриття, що відкриваються автоматично (chr.gov.ua) ===
+  { id: 1,  name: "вул. Паркова, 8",           lat: 46.30378, lng: 30.65437, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
+  { id: 2,  name: "вул. Паркова, 14",          lat: 46.30412, lng: 30.65521, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
+  { id: 3,  name: "вул. Паркова, 20",          lat: 46.30451, lng: 30.65632, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
+  { id: 4,  name: "вул. Паркова, 36",          lat: 46.30512, lng: 30.65811, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
+  { id: 5,  name: "вул. Парусна, 7",           lat: 46.30189, lng: 30.65123, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
+  { id: 6,  name: "вул. Парусна, 10",          lat: 46.30234, lng: 30.65087, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
+  { id: 7,  name: "вул. Парусна, 11",          lat: 46.30261, lng: 30.65042, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
+  { id: 8,  name: "Проспект Миру, 8",          lat: 46.30712, lng: 30.66023, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
+  { id: 9,  name: "Проспект Миру, 15Б",        lat: 46.30798, lng: 30.66189, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
+  { id: 10, name: "Проспект Миру, 26",         lat: 46.30912, lng: 30.66412, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
+  { id: 11, name: "Проспект Миру, 28",         lat: 46.30945, lng: 30.66498, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
+  { id: 12, name: "Проспект Миру, 32",         lat: 46.30989, lng: 30.66612, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
+  { id: 13, name: "Проспект Миру, 35Б",        lat: 46.31023, lng: 30.66701, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
+  { id: 14, name: "Проспект Миру, 35Г",        lat: 46.31045, lng: 30.66742, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
+  { id: 15, name: "Проспект Миру, 39",         lat: 46.31112, lng: 30.66891, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
+  { id: 16, name: "Проспект Миру, 41",         lat: 46.31167, lng: 30.66989, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
+  { id: 17, name: "вул. 1 Травня, 2",          lat: 46.30589, lng: 30.64871, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
+  { id: 18, name: "вул. 1 Травня, 5",          lat: 46.30567, lng: 30.64834, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
+  { id: 19, name: "вул. 1 Травня, 8А",         lat: 46.30521, lng: 30.64789, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
+  { id: 20, name: "вул. 1 Травня, 17",         lat: 46.30456, lng: 30.64678, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
+  { id: 21, name: "вул. Хантадзе, 10",         lat: 46.30834, lng: 30.65512, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
+  { id: 22, name: "вул. Олександрійська, 4",   lat: 46.30678, lng: 30.66234, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
+  { id: 23, name: "вул. Віталія Шума, 13",     lat: 46.30342, lng: 30.65987, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
+  { id: 24, name: "вул. Віталія Шума, 19",     lat: 46.30312, lng: 30.66034, type: "Підвал житлового будинку", autoOpen: true,  capacity: 0, source: "chr.gov.ua" },
+
+  // === Найпростіші укриття (селищна громада) ===
+  { id: 25, name: "вул. Захисників України, 33", lat: 46.31234, lng: 30.67123, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 26, name: "вул. Захисників України, 35", lat: 46.31267, lng: 30.67189, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 27, name: "вул. Захисників України, 36", lat: 46.31289, lng: 30.67212, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 28, name: "вул. Захисників України, 37", lat: 46.31301, lng: 30.67234, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 29, name: "вул. Захисників України, 38", lat: 46.31323, lng: 30.67256, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 30, name: "вул. Захисників України, 39А (ЗЗСО)", lat: 46.31345, lng: 30.67278, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 31, name: "вул. Захисників України, 40", lat: 46.31356, lng: 30.67301, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 32, name: "вул. Захисників України, 43", lat: 46.31389, lng: 30.67345, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 33, name: "вул. Захисників України, 44", lat: 46.31412, lng: 30.67367, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 34, name: "вул. Захисників України, 45", lat: 46.31434, lng: 30.67389, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 35, name: "вул. Захисників України, 47", lat: 46.31467, lng: 30.67423, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 36, name: "вул. Захисників України, 90 (Будинок культури)", lat: 46.31678, lng: 30.67623, type: "Сховище", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 37, name: "вул. Курортна, 2",          lat: 46.30012, lng: 30.65341, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 38, name: "вул. Сонячна, 1",           lat: 46.29945, lng: 30.65234, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 39, name: "вул. Сонячна, 2",           lat: 46.29923, lng: 30.65201, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 40, name: "вул. Сонячна, 3",           lat: 46.29901, lng: 30.65167, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 41, name: "вул. Сонячна, 4",           lat: 46.29878, lng: 30.65134, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 42, name: "с. Змієнкове, вул. Олімпійська, 4", lat: 46.29123, lng: 30.63891, type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+
+  // === Пункти обігріву ===
+  { id: 43, name: "вул. Данченка, 3-Д",        lat: 46.30234, lng: 30.65712, type: "Пункт обігріву", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 44, name: "вул. Паркова, 14-В",        lat: 46.30412, lng: 30.65521, type: "Пункт обігріву", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 45, name: "с. Малодолинське, вул. Миру, 17", lat: 46.32345, lng: 30.62341, type: "Пункт обігріву", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 46, name: "с. Бурлача Балка, вул. Інститутська, 22", lat: 46.34212, lng: 30.59123, type: "Пункт обігріву", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 47, name: "вул. В. Шума, 4 (лікарня)", lat: 46.30389, lng: 30.65871, type: "Пункт обігріву / Лікарня", autoOpen: false, capacity: 280, source: "Омбудсман 2024 (не введено в експлуатацію)" },
+  { id: 48, name: "сел. Олександрівка, вул. Центральна, 58", lat: 46.32678, lng: 30.61234, type: "Пункт обігріву", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 49, name: "вул. 1 Травня, 1 (поліклініка)", lat: 46.30589, lng: 30.64871, type: "Пункт обігріву / Поліклініка", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+  { id: 50, name: "сел. Олександрівка, вул. Перемоги, 64", lat: 46.32789, lng: 30.61389, type: "Пункт обігріву", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
+
+  // === Модульні укриття 2025 (Порт) ===
+  { id: 51, name: "Порт Чорноморськ — модульне укриття №1", lat: 46.29891, lng: 30.66123, type: "Модульне укриття", autoOpen: true, capacity: 0, source: "Порт 2025" },
+  { id: 52, name: "Порт Чорноморськ — модульне укриття №2", lat: 46.29867, lng: 30.66189, type: "Модульне укриття", autoOpen: true, capacity: 0, source: "Порт 2025" },
+  { id: 53, name: "Порт Чорноморськ — модульне укриття №3", lat: 46.29845, lng: 30.66234, type: "Модульне укриття", autoOpen: true, capacity: 0, source: "Порт 2025" }
 ];
 
 // ============================================================
@@ -691,28 +684,6 @@ const lex = {
     helpClose: "Зрозуміло",
     safetyTitle: "Безпека та приватність",
     safetyClose: "Зрозуміло",
-    help0Title: "Шари карти",
-    help0Text: "Кнопка зі стопкою перемикає шари: Гібрид (супутник + вулиці), Вулиці Esri, Вулиці OSM, Супутник.",
-    help5Title: "Перевірка координат",
-    help5Text: "Кнопка з сіткою вмикає режим перевірки. Торкніться карти — побачите точні координати та зможете їх скопіювати.",
-    help6Title: "Калібрування карти",
-    help6Text: "Кнопка з прицілом та колом — калібрування. Станьте на відомому місці, торкніться карти там, де ви насправді — всі укриття зсунуться на правильні місця.",
-    help1Title: "Моє місце",
-    help1Text: "Натисніть кнопку з прицілом — додаток визначить ваше місце та покаже на карті синім маркером.",
-    help2Title: "Найближче укриття",
-    help2Text: "Натисніть зірку — додаток знайде найближче укриття та покаже відстань до нього.",
-    help3Title: "Список укриттів",
-    help3Text: "Відкрийте список — усі укриття відсортовані за відстанню від вас. Натисніть на будь-яке, щоб побачити маршрут.",
-    help4Title: "Екстрена допомога",
-    help4Text: "Червона кнопка — швидкий виклик служби 101 (ДСНС).",
-    safety1Title: "Дані залишаються у вас",
-    safety1Text: "Геолокація не передається на сервери. Усі розрахунки відбуваються локально в браузері.",
-    safety2Title: "Без cookies та трекерів",
-    safety2Text: "Додаток не використовує cookies. Персональні дані не збираються.",
-    safety3Title: "Джерела даних",
-    safety3Text: "Укриття: відкриті дані Чорноморської громади, data.gov.ua. Карти: OpenStreetMap, Esri.",
-    safety4Title: "Точність даних",
-    safety4Text: "Координати укриттів можуть мати похибку до 50 м. У критичній ситуації телефонуйте 101.",
     locFound: "Місце визначено",
     locError: "Не вдалося отримати геолокацію",
     locWait: "Визначаю місце",
@@ -724,29 +695,19 @@ const lex = {
     debugOn: "Торкніться карти, щоб побачити координати",
     debugOff: "Режим перевірки вимкнено",
     copied: "Скопійовано",
-    layerHybrid: "Гібрид",
-    layerStreets: "Вулиці Esri",
-    layerOSM: "Вулиці OSM",
-    layerSat: "Супутник",
-    calibActive: "Активне калібрування",
-    calibShift: "зсув",
-    calibNotActive: "Калібрування не активне",
-    calibStart: "Почати",
-    calibReset: "Скинути",
-    calibClose: "Закрити",
+    layerHybrid: "Гібрид", layerStreets: "Вулиці Esri", layerOSM: "Вулиці OSM", layerSat: "Супутник",
+    calibActive: "Активне калібрування", calibShift: "зсув", calibNotActive: "Калібрування не активне",
+    calibStart: "Почати", calibReset: "Скинути", calibClose: "Закрити",
     calibTapMap: "Торкніться карти там, де ви ЗАРАЗ стоїте",
-    calibDone: "Відкалібровано. Зсув карти",
-    calibResetDone: "Калібрування скинуто",
-    calibCancelled: "Калібрування скасовано",
-    calibStep1Title: "1. Станьте на відомому місці",
-    calibStep1Text: "Наприклад, біля свого під'їзду, на розі відомої будівлі або біля пам'ятника.",
-    calibStep2Title: "2. Натисніть «Почати»",
-    calibStep2Text: "Додаток зафіксує ваше GPS-положення. Переконайтеся, що точність GPS не гірше 15 метрів.",
-    calibStep3Title: "3. Торкніться карти",
-    calibStep3Text: "Вкажіть на карті місце, де ви зараз стоїте. Застосунок обчислить зсув і автоматично перемістить усі укриття.",
-    calibIntro: "Якщо укриття на карті не співпадають з реальними будівлями — супутниковий знімок має геодезичний зсув. Ви можете виправити це, використовуючи своє GPS-положення як еталон.",
+    calibDone: "Відкалібровано. Зсув карти", calibResetDone: "Калібрування скинуто", calibCancelled: "Калібрування скасовано",
     routeBtn: "Прокласти маршрут",
-    iosGeoHint: "Для геолокації на iOS потрібен HTTPS. Будь ласка, використовуйте захищене з'єднання."
+    iosGeoHint: "Для геолокації потрібен HTTPS. Використовуйте захищене з'єднання.",
+    autoTag: "Авто", capacityTag: "місць",
+    addTitle: "Додати укриття", addIntro: "Заповніть інформацію про укриття. Дані збережуться локально.",
+    addSaved: "Укриття збережено",
+    addErrorName: "Введіть адресу або назву",
+    exportCSV: "Експорт CSV", exportJSON: "Експорт JSON", exported: "Файл завантажено",
+    addedByUser: "Додано користувачем"
   },
   en: {
     panelTitle: "CHORNOMORSK SHELTERS",
@@ -756,28 +717,6 @@ const lex = {
     helpClose: "Got it",
     safetyTitle: "Safety & privacy",
     safetyClose: "Got it",
-    help0Title: "Map layers",
-    help0Text: "Stack icon switches layers: Hybrid (satellite + streets), Esri Streets, OSM Streets, Satellite.",
-    help5Title: "Coordinate check",
-    help5Text: "Grid icon enables check mode. Tap the map — you'll see exact coordinates and can copy them.",
-    help6Title: "Map calibration",
-    help6Text: "Crosshair circle button — calibration. Stand at a known place, tap the map where you really are — all shelters shift to correct places.",
-    help1Title: "My location",
-    help1Text: "Tap the crosshair button — the app will find your location and show it as a blue marker.",
-    help2Title: "Nearest shelter",
-    help2Text: "Tap the star — the app will find the nearest shelter and show the distance to it.",
-    help3Title: "Shelter list",
-    help3Text: "Open the list — all shelters are sorted by distance from you. Tap any to see the route.",
-    help4Title: "Emergency",
-    help4Text: "The red button quickly dials 101 (emergency services).",
-    safety1Title: "Your data stays with you",
-    safety1Text: "Geolocation is not sent to servers. All calculations happen locally in the browser.",
-    safety2Title: "No cookies or trackers",
-    safety2Text: "The app does not use cookies. No personal data is collected.",
-    safety3Title: "Data sources",
-    safety3Text: "Shelters: open data of Chornomorsk community, data.gov.ua. Maps: OpenStreetMap, Esri.",
-    safety4Title: "Data accuracy",
-    safety4Text: "Shelter coordinates may have up to 50 m error. In a critical situation, call 101.",
     locFound: "Location found",
     locError: "Could not get location",
     locWait: "Finding location",
@@ -789,29 +728,19 @@ const lex = {
     debugOn: "Tap the map to see coordinates",
     debugOff: "Debug mode off",
     copied: "Copied",
-    layerHybrid: "Hybrid",
-    layerStreets: "Esri Streets",
-    layerOSM: "OSM Streets",
-    layerSat: "Satellite",
-    calibActive: "Calibration active",
-    calibShift: "shift",
-    calibNotActive: "Calibration not active",
-    calibStart: "Start",
-    calibReset: "Reset",
-    calibClose: "Close",
+    layerHybrid: "Hybrid", layerStreets: "Esri Streets", layerOSM: "OSM Streets", layerSat: "Satellite",
+    calibActive: "Calibration active", calibShift: "shift", calibNotActive: "Calibration not active",
+    calibStart: "Start", calibReset: "Reset", calibClose: "Close",
     calibTapMap: "Tap the map where you are NOW",
-    calibDone: "Calibrated. Map shift",
-    calibResetDone: "Calibration reset",
-    calibCancelled: "Calibration cancelled",
-    calibStep1Title: "1. Stand at a known place",
-    calibStep1Text: "For example, near your entrance, at a corner of a known building or at a monument.",
-    calibStep2Title: "2. Tap «Start»",
-    calibStep2Text: "The app will record your GPS position. Make sure GPS accuracy is not worse than 15 meters.",
-    calibStep3Title: "3. Tap the map",
-    calibStep3Text: "Point on the map where you are now. The app will compute the shift and automatically move all shelters.",
-    calibIntro: "If shelters on the map do not match real buildings — the satellite image has a geodetic shift. You can fix it using your GPS position as a reference.",
+    calibDone: "Calibrated. Map shift", calibResetDone: "Calibration reset", calibCancelled: "Calibration cancelled",
     routeBtn: "Build route",
-    iosGeoHint: "iOS geolocation requires HTTPS. Please use a secure connection."
+    iosGeoHint: "Geolocation requires HTTPS. Please use a secure connection.",
+    autoTag: "Auto", capacityTag: "places",
+    addTitle: "Add shelter", addIntro: "Fill in shelter information. Data is saved locally.",
+    addSaved: "Shelter saved",
+    addErrorName: "Enter address or name",
+    exportCSV: "Export CSV", exportJSON: "Export JSON", exported: "File downloaded",
+    addedByUser: "Added by user"
   }
 };
 
@@ -831,13 +760,15 @@ const state = {
   debugMode: false,
   debugPopup: null,
   calibration: { dLat: 0, dLng: 0 },
-  calibrating: false
+  calibrating: false,
+  userShelters: [],
+  pendingCoords: null
 };
 
 function t(key) { return lex[state.lang][key] || key; }
 
 // ============================================================
-// ХАПТИКА
+// ХАПТИКА / TOAST
 // ============================================================
 function haptic(style) {
   if (!navigator.vibrate) return;
@@ -845,16 +776,12 @@ function haptic(style) {
   try { navigator.vibrate(p[style] || [10]); } catch(e) {}
 }
 
-// ============================================================
-// TOAST
-// ============================================================
 function showToast(msg, ms = 2500, type = 'info') {
   const el = document.getElementById('toast');
   let iconSvg = ICONS.info;
   if (type === 'error') iconSvg = ICONS.warn;
   else if (type === 'warning') iconSvg = ICONS.warn;
   else if (type === 'success') iconSvg = ICONS.check;
-
   el.innerHTML = iconSvg + '<span>' + msg + '</span>';
   el.classList.remove('error', 'warning', 'info');
   if (type === 'error') el.classList.add('error');
@@ -875,19 +802,15 @@ function applyCalibration(lat, lng) {
 function saveCalibrationToStorage() {
   try { localStorage.setItem('safety_calibration_v1', JSON.stringify(state.calibration)); } catch (e) {}
 }
-
 function loadCalibrationFromStorage() {
   try {
     const raw = localStorage.getItem('safety_calibration_v1');
     if (raw) {
       const d = JSON.parse(raw);
-      if (typeof d.dLat === 'number' && typeof d.dLng === 'number') {
-        state.calibration = d;
-      }
+      if (typeof d.dLat === 'number' && typeof d.dLng === 'number') state.calibration = d;
     }
   } catch (e) {}
 }
-
 function offsetInMeters() {
   const d = state.calibration;
   if (!d.dLat && !d.dLng) return 0;
@@ -906,7 +829,6 @@ function rebuildAllMarkers() {
     state.userMarker.setLatLng([mLat, mLng]);
     if (state.accuracyCircle) state.accuracyCircle.setLatLng([mLat, mLng]);
   }
-
   if (state.selectedShelter && state.userLatLng && state.routeLine) {
     const [uLat, uLng] = applyCalibration(state.userLatLng.lat, state.userLatLng.lng);
     const [sLat, sLng] = applyCalibration(state.selectedShelter.lat, state.selectedShelter.lng);
@@ -919,11 +841,9 @@ function openCalibrationModal() {
   updateCalibrationDisplay();
   haptic('light');
 }
-
 function closeCalibrationModal() {
   document.getElementById('calibration-modal').classList.remove('active');
 }
-
 function updateCalibrationDisplay() {
   const el = document.getElementById('calibration-current');
   const shift = offsetInMeters();
@@ -939,44 +859,26 @@ function updateCalibrationDisplay() {
     if (btn) btn.classList.remove('debug-active');
   }
 }
-
 function startCalibration() {
-  if (!state.userLatLng) {
-    showToast(t('noGeo'), 2500, 'warning');
-    return;
-  }
+  if (!state.userLatLng) { showToast(t('noGeo'), 2500, 'warning'); return; }
   closeCalibrationModal();
   state.calibrating = true;
-
-  const btn = document.getElementById('btn-calibrate');
-  if (btn) btn.classList.add('debug-active');
-
   showToast(t('calibTapMap'), 6000, 'info');
   map.on('click', onCalibrationClick);
   haptic('medium');
 }
-
 function onCalibrationClick(e) {
   if (!state.calibrating) return;
-
-  const tapped = e.latlng;
-  const gps = state.userLatLng;
-
-  state.calibration.dLat = tapped.lat - gps.lat;
-  state.calibration.dLng = tapped.lng - gps.lng;
-
+  state.calibration.dLat = e.latlng.lat - state.userLatLng.lat;
+  state.calibration.dLng = e.latlng.lng - state.userLatLng.lng;
   saveCalibrationToStorage();
   state.calibrating = false;
   map.off('click', onCalibrationClick);
-
   rebuildAllMarkers();
   updateCalibrationDisplay();
-
-  const shift = offsetInMeters();
-  showToast(t('calibDone') + ' ≈ ' + shift + ' м', 3500, 'success');
+  showToast(t('calibDone') + ' ≈ ' + offsetInMeters() + ' м', 3500, 'success');
   haptic('heavy');
 }
-
 function resetCalibration() {
   state.calibration = { dLat: 0, dLng: 0 };
   saveCalibrationToStorage();
@@ -990,32 +892,25 @@ function resetCalibration() {
 // ============================================================
 // КАРТА
 // ============================================================
-const map = L.map('map', {
-  zoomControl: false,
-  attributionControl: false,
-  inertia: true
-}).setView([46.3050, 30.6600], 16);
+const map = L.map('map', { zoomControl: false, attributionControl: false, inertia: true })
+  .setView([46.3050, 30.6600], 16);
 
 const TRANSPARENT_PX = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 
 const layerOSM = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19, maxNativeZoom: 19, attribution: 'OpenStreetMap', errorTileUrl: TRANSPARENT_PX
+  maxZoom: 19, maxNativeZoom: 19, errorTileUrl: TRANSPARENT_PX
 });
-
 const layerStreets = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
-  maxZoom: 19, maxNativeZoom: 19, attribution: 'Esri Streets', errorTileUrl: TRANSPARENT_PX
+  maxZoom: 19, maxNativeZoom: 19, errorTileUrl: TRANSPARENT_PX
 });
-
 const layerSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-  maxZoom: 19, maxNativeZoom: 18, attribution: 'Esri World Imagery', errorTileUrl: TRANSPARENT_PX
+  maxZoom: 19, maxNativeZoom: 18, errorTileUrl: TRANSPARENT_PX
 });
-
 const layerHybridLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
-  maxZoom: 19, maxNativeZoom: 18, attribution: 'Esri Labels', opacity: 0.95, errorTileUrl: TRANSPARENT_PX
+  maxZoom: 19, maxNativeZoom: 18, opacity: 0.95, errorTileUrl: TRANSPARENT_PX
 });
-
 const layerHybridRoads = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', {
-  maxZoom: 19, maxNativeZoom: 18, attribution: 'Esri Transportation', opacity: 0.85, errorTileUrl: TRANSPARENT_PX
+  maxZoom: 19, maxNativeZoom: 18, opacity: 0.85, errorTileUrl: TRANSPARENT_PX
 });
 
 const mapLayers = {
@@ -1038,23 +933,19 @@ function setMapLayer(name) {
   const next = mapLayers[name];
   if (next.base) next.base.addTo(map);
   next.overlays.forEach(l => l.addTo(map));
-
   const btn = document.getElementById('btn-layer');
   if (btn) btn.classList.toggle('active', name === 'hybrid');
-
   const labelKey = { hybrid: 'layerHybrid', streets: 'layerStreets', osm: 'layerOSM', sat: 'layerSat' }[name];
   const label = t(labelKey);
   const indicatorText = document.getElementById('layer-indicator-text');
   if (indicatorText) indicatorText.textContent = label;
   showToast(label, 1600);
 }
-
 function toggleMapLayer() {
   haptic('light');
   const order = ['hybrid', 'streets', 'osm', 'sat'];
   const idx = order.indexOf(state.currentLayer);
-  const next = order[(idx + 1) % order.length];
-  setMapLayer(next);
+  setMapLayer(order[(idx + 1) % order.length]);
 }
 
 const routeLayer = L.layerGroup().addTo(map);
@@ -1065,27 +956,28 @@ const routeLayer = L.layerGroup().addTo(map);
 function shelterIcon(type) {
   const color = colorFor(type);
   const icon = ICONS.home;
-
   return L.divIcon({
     className: 'shelter-marker',
     html: '<div style="width:36px;height:36px;border-radius:50%;background:' + color + ';border:3px solid #fff;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 3px rgba(0,0,0,0.3),0 4px 12px rgba(0,0,0,0.6);">' +
-      '<div style="width:20px;height:20px;color:#000;">' + icon.replace('<svg', '<svg style="width:20px;height:20px;fill:none;stroke:#000;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;"') + '</div>' +
+      '<div style="width:20px;height:20px;">' + icon.replace('<svg', '<svg style="width:20px;height:20px;fill:none;stroke:#000;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;"') + '</div>' +
     '</div>',
-    iconSize: [36, 36],
-    iconAnchor: [18, 18],
-    popupAnchor: [0, -20]
+    iconSize: [36, 36], iconAnchor: [18, 18], popupAnchor: [0, -20]
   });
 }
 
+function getAllShelters() {
+  return SHELTERS.concat(state.userShelters);
+}
+
 function addShelterMarkers() {
-  SHELTERS.forEach(s => {
+  getAllShelters().forEach(s => {
     const [mLat, mLng] = applyCalibration(s.lat, s.lng);
     const marker = L.marker([mLat, mLng], { icon: shelterIcon(s.type) }).addTo(map);
-
     const color = colorFor(s.type);
-    // Безпечний popup без використання innerHTML (захист від XSS)
+
+    // Безпечний popup через DOM API
     const popupContent = document.createElement('div');
-    popupContent.style.fontFamily = 'Inter, sans-serif';
+    popupContent.style.fontFamily = 'inherit';
 
     const titleDiv = document.createElement('div');
     titleDiv.className = 'popup-title';
@@ -1099,9 +991,21 @@ function addShelterMarkers() {
     typeDiv.className = 'popup-type';
     typeDiv.textContent = s.type;
 
-    const coordsDiv = document.createElement('div');
-    coordsDiv.className = 'popup-coords';
-    coordsDiv.textContent = s.lat.toFixed(6) + ', ' + s.lng.toFixed(6);
+    const metaDiv = document.createElement('div');
+    metaDiv.className = 'popup-meta';
+    const metaParts = [s.lat.toFixed(6) + ', ' + s.lng.toFixed(6)];
+    if (s.autoOpen) {
+      const autoSpan = document.createElement('span');
+      autoSpan.className = 'auto';
+      autoSpan.textContent = ' · ' + t('autoTag');
+      metaDiv.appendChild(document.createTextNode(s.lat.toFixed(6) + ', ' + s.lng.toFixed(6)));
+      metaDiv.appendChild(autoSpan);
+    } else {
+      metaDiv.textContent = s.lat.toFixed(6) + ', ' + s.lng.toFixed(6);
+    }
+    if (s.capacity && s.capacity > 0) {
+      metaDiv.appendChild(document.createTextNode(' · ' + s.capacity + ' ' + t('capacityTag')));
+    }
 
     const btn = document.createElement('button');
     btn.className = 'popup-btn';
@@ -1113,21 +1017,17 @@ function addShelterMarkers() {
 
     popupContent.appendChild(titleDiv);
     popupContent.appendChild(typeDiv);
-    popupContent.appendChild(coordsDiv);
+    popupContent.appendChild(metaDiv);
     popupContent.appendChild(btn);
 
     marker.bindPopup(popupContent);
-
     state.shelterMarkers[s.id] = marker;
   });
 }
 
 function selectShelterById(id) {
-  const shelter = SHELTERS.find(s => s.id === id);
-  if (shelter) {
-    selectShelter(shelter);
-    map.closePopup();
-  }
+  const shelter = getAllShelters().find(s => s.id === id);
+  if (shelter) { selectShelter(shelter); map.closePopup(); }
 }
 
 // ============================================================
@@ -1136,26 +1036,14 @@ function selectShelterById(id) {
 function selectShelter(shelter) {
   state.selectedShelter = shelter;
   haptic('medium');
-
-  if (!state.userLatLng) {
-    showToast(t('noGeo'), 2500, 'warning');
-    return;
-  }
-
+  if (!state.userLatLng) { showToast(t('noGeo'), 2500, 'warning'); return; }
   routeLayer.clearLayers();
-
   const [uLat, uLng] = applyCalibration(state.userLatLng.lat, state.userLatLng.lng);
   const [sLat, sLng] = applyCalibration(shelter.lat, shelter.lng);
-
   state.routeLine = L.polyline([[uLat, uLng], [sLat, sLng]], {
     color: '#00FFB2', weight: 5, opacity: 0.9, dashArray: '12, 8', lineCap: 'round'
   }).addTo(routeLayer);
-
-  const d = map.distance(
-    [state.userLatLng.lat, state.userLatLng.lng],
-    [shelter.lat, shelter.lng]
-  );
-
+  const d = map.distance([state.userLatLng.lat, state.userLatLng.lng], [shelter.lat, shelter.lng]);
   updateHUD(d, shelter.name);
   map.fitBounds(state.routeLine.getBounds(), { padding: [80, 80] });
   closeShelterList();
@@ -1165,85 +1053,52 @@ function updateHUD(distance, shelterName) {
   const v = document.getElementById('res-val');
   const u = document.getElementById('res-unit');
   const sn = document.getElementById('shelter-name-hud');
-
-  if (distance < 1000) {
-    v.textContent = distance.toFixed(0);
-    u.textContent = t('meters');
-  } else {
-    v.textContent = (distance / 1000).toFixed(2);
-    u.textContent = t('km');
-  }
-
-  if (shelterName) {
-    sn.textContent = shelterName;
-    sn.classList.add('visible');
-  } else {
-    sn.classList.remove('visible');
-  }
+  if (distance < 1000) { v.textContent = distance.toFixed(0); u.textContent = t('meters'); }
+  else { v.textContent = (distance / 1000).toFixed(2); u.textContent = t('km'); }
+  if (shelterName) { sn.textContent = shelterName; sn.classList.add('visible'); }
+  else { sn.classList.remove('visible'); }
 }
 
 // ============================================================
-// ГЕОЛОКАЦІЯ (виправлено для iOS — вимога HTTPS та дії користувача)
+// ГЕОЛОКАЦІЯ
 // ============================================================
 function locateUser() {
-  // Перевірка безпечного контексту (HTTPS)
   if (!window.isSecureContext) {
     showToast(t('iosGeoHint'), 5000, 'warning');
-    console.warn('[GPS] Geolocation requires HTTPS. Current protocol: ' + window.location.protocol);
     return;
   }
-
-  if (!navigator.geolocation) {
-    showToast('GPS not supported', 2500, 'error');
-    return;
-  }
-
+  if (!navigator.geolocation) { showToast('GPS not supported', 2500, 'error'); return; }
   haptic('medium');
   showToast(t('locWait'), 2000);
-
-  // iOS Safari вимагає, щоб виклик був у контексті дії користувача
-  // (click, touchend, keydown) — не в setTimeout
   navigator.geolocation.getCurrentPosition(
     pos => {
       const lat = pos.coords.latitude;
       const lng = pos.coords.longitude;
       const acc = pos.coords.accuracy;
-
       state.userLatLng = { lat, lng };
-
       if (state.userMarker) map.removeLayer(state.userMarker);
       if (state.accuracyCircle) map.removeLayer(state.accuracyCircle);
-
       const [mLat, mLng] = applyCalibration(lat, lng);
-
       const userIcon = L.divIcon({
         className: 'user-marker-wrapper',
         html: '<div class="user-marker"></div>',
-        iconSize: [20, 20],
-        iconAnchor: [10, 10]
+        iconSize: [20, 20], iconAnchor: [10, 10]
       });
       state.userMarker = L.marker([mLat, mLng], { icon: userIcon, zIndexOffset: 1000 })
         .addTo(map)
-        .bindPopup('<div style="color:#fff;font-family:sans-serif;text-align:center;"><strong>' + t('you') + '</strong><br><small>±' + Math.round(acc) + ' м</small></div>');
-
+        .bindPopup('<div style="color:#fff;text-align:center;"><strong>' + t('you') + '</strong><br><small>±' + Math.round(acc) + ' м</small></div>');
       state.accuracyCircle = L.circle([mLat, mLng], {
         radius: acc, color: '#3B82F6', fillColor: '#3B82F6', fillOpacity: 0.12, weight: 1
       }).addTo(map);
-
       map.setView([mLat, mLng], 16);
       showToast(t('locFound') + ' (±' + Math.round(acc) + ' м)', 2000, 'success');
-
       renderShelterList();
     },
     err => {
-      console.error('[GPS] Error:', err);
       let msg = t('locError');
-      switch (err.code) {
-        case 1: msg = 'Доступ до геолокації заборонено'; break;
-        case 2: msg = 'Місце недоступне'; break;
-        case 3: msg = 'Час очікування вичерпано'; break;
-        default: msg = 'Помилка GPS: ' + err.message;
-      }
+      if (err.code === 1) msg = 'Доступ до геолокації заборонено';
+      if (err.code === 2) msg = 'Місце недоступне';
+      if (err.code === 3) msg = 'Час очікування вичерпано';
       showToast(msg, 3000, 'error');
     },
     { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -1254,25 +1109,13 @@ function locateUser() {
 // НАЙБЛИЖЧЕ УКРИТТЯ
 // ============================================================
 function findNearest() {
-  if (!state.userLatLng) {
-    showToast(t('noGeo'), 2500, 'warning');
-    locateUser();
-    return;
-  }
-
+  if (!state.userLatLng) { showToast(t('noGeo'), 2500, 'warning'); locateUser(); return; }
   haptic('heavy');
-
-  let nearest = null;
-  let minDist = Infinity;
-
-  SHELTERS.forEach(s => {
-    const d = map.distance(
-      [state.userLatLng.lat, state.userLatLng.lng],
-      [s.lat, s.lng]
-    );
+  let nearest = null, minDist = Infinity;
+  getAllShelters().forEach(s => {
+    const d = map.distance([state.userLatLng.lat, state.userLatLng.lng], [s.lat, s.lng]);
     if (d < minDist) { minDist = d; nearest = s; }
   });
-
   if (nearest) {
     selectShelter(nearest);
     const marker = state.shelterMarkers[nearest.id];
@@ -1289,52 +1132,43 @@ function openShelterList() {
   document.getElementById('shelter-panel').classList.add('open');
   haptic('light');
 }
-
 function closeShelterList() {
   document.getElementById('shelter-panel').classList.remove('open');
 }
-
 function renderShelterList() {
   const list = document.getElementById('shelter-list');
   list.innerHTML = '';
-
-  let items = [...SHELTERS];
-
+  let items = [...getAllShelters()];
   if (state.userLatLng) {
     items = items.map(s => {
-      const d = map.distance(
-        [state.userLatLng.lat, state.userLatLng.lng],
-        [s.lat, s.lng]
-      );
-      return { ...s, distance: d };
+      const d = map.distance([state.userLatLng.lat, state.userLatLng.lng], [s.lat, s.lng]);
+      return Object.assign({}, s, { distance: d });
     }).sort((a, b) => a.distance - b.distance);
   }
-
   items.forEach(s => {
     const item = document.createElement('div');
     item.className = 'shelter-item';
-
-    let distClass = '';
-    let distText = '—';
+    let distClass = '', distText = '—';
     if (s.distance !== undefined) {
       if (s.distance < 500) distClass = '';
       else if (s.distance < 1500) distClass = 'far';
       else distClass = 'very-far';
-
-      if (s.distance < 1000) distText = s.distance.toFixed(0) + ' м';
-      else distText = (s.distance / 1000).toFixed(2) + ' км';
+      distText = s.distance < 1000 ? s.distance.toFixed(0) + ' м' : (s.distance / 1000).toFixed(2) + ' км';
     }
-
     const icon = iconFor(s.type);
     const iconSvg = ICONS[icon.key];
+    const metaParts = [s.type];
+    if (s.autoOpen) metaParts.push('<span class="auto-tag">' + t('autoTag') + '</span>');
+    if (s.capacity && s.capacity > 0) metaParts.push(s.capacity + ' ' + t('capacityTag'));
 
     item.innerHTML =
       '<div class="icon ' + icon.cls + '">' + iconSvg + '</div>' +
       '<div class="info">' +
-        '<div class="name">' + s.name + '</div>' +
-        '<div class="meta">' + s.type + '</div>' +
+        '<div class="name"></div>' +
+        '<div class="meta">' + metaParts.join(' · ') + '</div>' +
       '</div>' +
       '<div class="distance ' + distClass + '">' + distText + '</div>';
+    item.querySelector('.name').textContent = s.name;
 
     item.addEventListener('click', () => {
       map.setView([s.lat, s.lng], 17);
@@ -1343,7 +1177,6 @@ function renderShelterList() {
       selectShelter(s);
       closeShelterList();
     });
-
     list.appendChild(item);
   });
 }
@@ -1367,9 +1200,7 @@ function clearRoute() {
 // ============================================================
 function callEmergency() {
   haptic('heavy');
-  if (confirm(t('callConfirm'))) {
-    window.location.href = 'tel:101';
-  }
+  if (confirm(t('callConfirm'))) window.location.href = 'tel:101';
 }
 
 // ============================================================
@@ -1380,7 +1211,6 @@ function toggleDebugMode() {
   haptic('medium');
   const btn = document.getElementById('btn-debug');
   if (btn) btn.classList.toggle('debug-active', state.debugMode);
-
   if (state.debugMode) {
     showToast(t('debugOn'), 2500, 'info');
     map.on('click', onDebugClick);
@@ -1393,11 +1223,9 @@ function toggleDebugMode() {
 
 function onDebugClick(e) {
   const { lat, lng } = e.latlng;
-
   if (state.debugPopup) map.closePopup(state.debugPopup);
-
   const content = document.createElement('div');
-  content.style.fontFamily = "'JetBrains Mono', monospace";
+  content.style.fontFamily = 'monospace';
   content.style.fontSize = '0.8rem';
   content.style.lineHeight = '1.6';
   content.style.color = '#fff';
@@ -1415,27 +1243,15 @@ function onDebugClick(e) {
   header.appendChild(headerSpan);
 
   const latLine = document.createElement('div');
-  latLine.innerHTML = 'lat: <b>' + lat.toFixed(6) + '</b>';
-
+  latLine.textContent = 'lat: ' + lat.toFixed(6);
   const lngLine = document.createElement('div');
-  lngLine.innerHTML = 'lng: <b>' + lng.toFixed(6) + '</b>';
+  lngLine.textContent = 'lng: ' + lng.toFixed(6);
 
   const copyBtn = document.createElement('button');
-  copyBtn.style.marginTop = '8px';
-  copyBtn.style.padding = '6px 12px';
-  copyBtn.style.background = '#3B82F6';
-  copyBtn.style.color = '#fff';
-  copyBtn.style.border = 'none';
-  copyBtn.style.borderRadius = '8px';
-  copyBtn.style.fontWeight = 'bold';
-  copyBtn.style.cursor = 'pointer';
-  copyBtn.style.fontFamily = 'sans-serif';
-  copyBtn.style.display = 'inline-flex';
-  copyBtn.style.alignItems = 'center';
-  copyBtn.style.gap = '6px';
+  copyBtn.style.cssText = 'margin-top:8px;padding:6px 12px;background:#3B82F6;color:#fff;border:none;border-radius:8px;font-weight:bold;cursor:pointer;display:inline-flex;align-items:center;gap:6px;';
   copyBtn.innerHTML = ICONS.copy;
   const copySpan = document.createElement('span');
-  copySpan.textContent = t('copied').replace('Скопійовано','Копіювати').replace('Copied','Copy');
+  copySpan.textContent = t('copied');
   copyBtn.appendChild(copySpan);
   copyBtn.addEventListener('click', () => copyCoords(lat, lng));
 
@@ -1444,10 +1260,7 @@ function onDebugClick(e) {
   content.appendChild(lngLine);
   content.appendChild(copyBtn);
 
-  state.debugPopup = L.popup()
-    .setLatLng(e.latlng)
-    .setContent(content)
-    .openOn(map);
+  state.debugPopup = L.popup().setLatLng(e.latlng).setContent(content).openOn(map);
 }
 
 function copyCoords(lat, lng) {
@@ -1456,12 +1269,113 @@ function copyCoords(lat, lng) {
     navigator.clipboard.writeText(text).then(() => {
       showToast(t('copied') + ': ' + text, 2500, 'success');
       haptic('medium');
-    }).catch(() => {
-      prompt('Скопіюйте координати:', text);
-    });
+    }).catch(() => prompt('Скопіюйте координати:', text));
   } else {
     prompt('Скопіюйте координати:', text);
   }
+}
+
+// ============================================================
+// ДОДАВАННЯ УКРИТТЯ (громадянська наука)
+// ============================================================
+function openAddModal() {
+  haptic('light');
+  document.getElementById('add-modal').classList.add('active');
+
+  // Спроба отримати координати з GPS або з центру карти
+  if (state.userLatLng) {
+    state.pendingCoords = { lat: state.userLatLng.lat, lng: state.userLatLng.lng };
+    document.getElementById('add-coords-info').textContent = 'Координати: ' + state.userLatLng.lat.toFixed(6) + ', ' + state.userLatLng.lng.toFixed(6) + ' (з GPS)';
+  } else {
+    const c = map.getCenter();
+    state.pendingCoords = { lat: c.lat, lng: c.lng };
+    document.getElementById('add-coords-info').textContent = 'Координати: ' + c.lat.toFixed(6) + ', ' + c.lng.toFixed(6) + ' (центр карти)';
+  }
+
+  document.getElementById('add-name').value = '';
+  document.getElementById('add-capacity').value = '';
+  document.getElementById('add-notes').value = '';
+}
+
+function closeAddModal() {
+  document.getElementById('add-modal').classList.remove('active');
+  state.pendingCoords = null;
+}
+
+function saveNewShelter() {
+  const name = document.getElementById('add-name').value.trim();
+  if (!name) { showToast(t('addErrorName'), 2000, 'warning'); return; }
+  if (!state.pendingCoords) { showToast('Немає координат', 2000, 'error'); return; }
+
+  const newShelter = {
+    id: 10000 + state.userShelters.length,
+    name: name,
+    lat: state.pendingCoords.lat,
+    lng: state.pendingCoords.lng,
+    type: document.getElementById('add-type').value,
+    autoOpen: document.getElementById('add-auto').value === 'true',
+    capacity: parseInt(document.getElementById('add-capacity').value) || 0,
+    source: t('addedByUser'),
+    notes: document.getElementById('add-notes').value.trim()
+  };
+
+  state.userShelters.push(newShelter);
+  saveUserShelters();
+  rebuildAllMarkers();
+  renderShelterList();
+  closeAddModal();
+  showToast(t('addSaved') + ': ' + name, 2500, 'success');
+  haptic('heavy');
+}
+
+function saveUserShelters() {
+  try { localStorage.setItem('safety_user_shelters_v1', JSON.stringify(state.userShelters)); } catch (e) {}
+}
+function loadUserShelters() {
+  try {
+    const raw = localStorage.getItem('safety_user_shelters_v1');
+    if (raw) state.userShelters = JSON.parse(raw) || [];
+  } catch (e) { state.userShelters = []; }
+}
+
+// ============================================================
+// ЕКСПОРТ ДАНИХ
+// ============================================================
+function exportCSV() {
+  const items = getAllShelters();
+  const headers = ['id', 'name', 'lat', 'lng', 'type', 'autoOpen', 'capacity', 'source'];
+  const rows = items.map(s => [
+    s.id,
+    '"' + (s.name || '').replace(/"/g, '""') + '"',
+    s.lat,
+    s.lng,
+    '"' + (s.type || '').replace(/"/g, '""') + '"',
+    s.autoOpen ? 'так' : 'ні',
+    s.capacity || 0,
+    '"' + (s.source || '').replace(/"/g, '""') + '"'
+  ].join(','));
+  const csv = headers.join(',') + '\n' + rows.join('\n');
+  downloadFile('shelters-chornomorsk.csv', csv, 'text/csv;charset=utf-8');
+  showToast(t('exported') + ': CSV (' + items.length + ')', 2000, 'success');
+}
+
+function exportJSON() {
+  const items = getAllShelters();
+  const json = JSON.stringify(items, null, 2);
+  downloadFile('shelters-chornomorsk.json', json, 'application/json;charset=utf-8');
+  showToast(t('exported') + ': JSON (' + items.length + ')', 2000, 'success');
+}
+
+function downloadFile(filename, content, mime) {
+  const blob = new Blob(['\ufeff' + content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // ============================================================
@@ -1470,54 +1384,21 @@ function copyCoords(lat, lng) {
 function toggleLang() {
   state.lang = state.lang === 'uk' ? 'en' : 'uk';
   const L2 = lex[state.lang];
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
 
-  document.getElementById('panel-title').textContent = L2.panelTitle;
-  document.getElementById('sos-label').textContent = L2.sosLabel;
-  document.getElementById('help-title').textContent = L2.helpTitle;
-  document.getElementById('btn-close-help').textContent = L2.helpClose;
-  document.getElementById('safety-title').textContent = L2.safetyTitle;
-  document.getElementById('btn-close-safety').textContent = L2.safetyClose;
-  document.getElementById('help-0-title').textContent = L2.help0Title;
-  document.getElementById('help-0-text').textContent = L2.help0Text;
-  document.getElementById('help-5-title').textContent = L2.help5Title;
-  document.getElementById('help-5-text').textContent = L2.help5Text;
-  document.getElementById('help-6-title').textContent = L2.help6Title;
-  document.getElementById('help-6-text').textContent = L2.help6Text;
-  document.getElementById('help-1-title').textContent = L2.help1Title;
-  document.getElementById('help-1-text').textContent = L2.help1Text;
-  document.getElementById('help-2-title').textContent = L2.help2Title;
-  document.getElementById('help-2-text').textContent = L2.help2Text;
-  document.getElementById('help-3-title').textContent = L2.help3Title;
-  document.getElementById('help-3-text').textContent = L2.help3Text;
-  document.getElementById('help-4-title').textContent = L2.help4Title;
-  document.getElementById('help-4-text').textContent = L2.help4Text;
-  document.getElementById('safety-1-title').textContent = L2.safety1Title;
-  document.getElementById('safety-1-text').textContent = L2.safety1Text;
-  document.getElementById('safety-2-title').textContent = L2.safety2Title;
-  document.getElementById('safety-2-text').textContent = L2.safety2Text;
-  document.getElementById('safety-3-title').textContent = L2.safety3Title;
-  document.getElementById('safety-3-text').textContent = L2.safety3Text;
-  document.getElementById('safety-4-title').textContent = L2.safety4Title;
-  document.getElementById('safety-4-text').textContent = L2.safety4Text;
+  set('panel-title', L2.panelTitle);
+  set('sos-label', L2.sosLabel);
+  set('help-title', L2.helpTitle);
+  set('btn-close-help', L2.helpClose);
+  set('safety-title', L2.safetyTitle);
+  set('btn-close-safety', L2.safetyClose);
+  set('add-title', L2.addTitle);
+  set('add-intro', L2.addIntro);
+  set('res-unit', L2.meters);
+  set('help-btn-label', state.lang === 'uk' ? 'Посібник' : 'Help');
+  set('safety-btn-label', state.lang === 'uk' ? 'Безпека' : 'Safety');
 
-  // Калібрування
-  document.getElementById('calib-title').textContent = state.lang === 'uk' ? 'Калібрування карти' : 'Map calibration';
-  document.getElementById('calib-intro').textContent = L2.calibIntro;
-  document.getElementById('calib-s1-title').textContent = L2.calibStep1Title;
-  document.getElementById('calib-s1-text').textContent = L2.calibStep1Text;
-  document.getElementById('calib-s2-title').textContent = L2.calibStep2Title;
-  document.getElementById('calib-s2-text').textContent = L2.calibStep2Text;
-  document.getElementById('calib-s3-title').textContent = L2.calibStep3Title;
-  document.getElementById('calib-s3-text').textContent = L2.calibStep3Text;
-  document.getElementById('btn-close-calib').textContent = L2.calibClose;
-  document.querySelector('#btn-calib-start span').textContent = L2.calibStart;
-  document.querySelector('#btn-calib-reset span').textContent = L2.calibReset;
-  updateCalibrationDisplay();
-
-  document.getElementById('res-unit').textContent = L2.meters;
-  document.getElementById('help-btn-label').textContent = state.lang === 'uk' ? 'Посібник' : 'Help';
-  document.getElementById('safety-btn-label').textContent = state.lang === 'uk' ? 'Безпека' : 'Safety';
-
+  // Оновити індикатор шару
   const indicatorText = document.getElementById('layer-indicator-text');
   if (indicatorText) {
     const labelKey = { hybrid: 'layerHybrid', streets: 'layerStreets', osm: 'layerOSM', sat: 'layerSat' }[state.currentLayer];
@@ -1526,11 +1407,12 @@ function toggleLang() {
 
   document.documentElement.lang = state.lang;
   renderShelterList();
+  updateCalibrationDisplay();
   haptic('light');
 }
 
 // ============================================================
-// МОДАЛЬНІ ВІКНА
+// МОДАЛЬНІ ВІКНА HELP/SAFETY
 // ============================================================
 function openHelp() { document.getElementById('help-modal').classList.add('active'); haptic('light'); }
 function closeHelp() { document.getElementById('help-modal').classList.remove('active'); haptic('light'); }
@@ -1538,7 +1420,7 @@ function openSafety() { document.getElementById('safety-modal').classList.add('a
 function closeSafety() { document.getElementById('safety-modal').classList.remove('active'); haptic('light'); }
 
 // ============================================================
-// CANVAS — службовий шар
+// CANVAS
 // ============================================================
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
@@ -1551,28 +1433,27 @@ addEventListener('resize', syncSize);
 syncSize();
 
 // ============================================================
-// ІНІЦІАЛІЗАЦІЯ ТА ОБРОБНИКИ ПОДІЙ (без inline onclick)
+// ІНІЦІАЛІЗАЦІЯ
 // ============================================================
 window.addEventListener('load', () => {
   setTimeout(() => map.invalidateSize(), 300);
 
   loadCalibrationFromStorage();
+  loadUserShelters();
   addShelterMarkers();
   updateCalibrationDisplay();
 
   const indicatorText = document.getElementById('layer-indicator-text');
   if (indicatorText) indicatorText.textContent = t('layerHybrid');
 
-  // Геолокація НЕ викликається автоматично — iOS Safari вимагає дії користувача
-  // Користувач натискає кнопку "Моє місце"
-
-  // ===== ОБРОБНИКИ ПОДІЙ (addEventListener замість inline onclick) =====
+  // Обробники подій
   document.getElementById('btn-help').addEventListener('click', openHelp);
   document.getElementById('btn-safety').addEventListener('click', openSafety);
   document.getElementById('btn-lang').addEventListener('click', toggleLang);
   document.getElementById('btn-layer').addEventListener('click', toggleMapLayer);
   document.getElementById('btn-debug').addEventListener('click', toggleDebugMode);
   document.getElementById('btn-calibrate').addEventListener('click', openCalibrationModal);
+  document.getElementById('btn-add').addEventListener('click', openAddModal);
   document.getElementById('btn-locate').addEventListener('click', locateUser);
   document.getElementById('btn-list').addEventListener('click', openShelterList);
   document.getElementById('btn-nearest').addEventListener('click', findNearest);
@@ -1586,8 +1467,12 @@ window.addEventListener('load', () => {
   document.getElementById('btn-calib-start').addEventListener('click', startCalibration);
   document.getElementById('btn-calib-reset').addEventListener('click', resetCalibration);
   document.getElementById('btn-close-calib').addEventListener('click', closeCalibrationModal);
+  document.getElementById('btn-export-csv').addEventListener('click', exportCSV);
+  document.getElementById('btn-export-json').addEventListener('click', exportJSON);
+  document.getElementById('btn-add-save').addEventListener('click', saveNewShelter);
+  document.getElementById('btn-add-cancel').addEventListener('click', closeAddModal);
 
-  console.log('Curvimeter SAFETY v4.0 — CSP enabled, no inline handlers, GDPR-compliant fonts, iOS geolocation fixed');
+  console.log('Curvimeter SAFETY v5.0 — Leaflet 1.9.4, science fields, citizen science mode');
 });
 
 document.addEventListener('keydown', (e) => {
@@ -1595,6 +1480,7 @@ document.addEventListener('keydown', (e) => {
     closeHelp();
     closeSafety();
     closeShelterList();
+    closeAddModal();
     if (state.debugMode) toggleDebugMode();
     if (state.calibrating) {
       state.calibrating = false;
@@ -1605,11 +1491,9 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// ============================================================
-// ЕКСПОРТ ФУНКЦІЙ У ГЛОБАЛЬНИЙ SCOPE (для динамічного HTML)
-// ============================================================
+// Експорт функцій
 window.selectShelterById = selectShelterById;
 window.copyCoords = copyCoords;
 </script>
 </body>
-</html>
+  </html>
