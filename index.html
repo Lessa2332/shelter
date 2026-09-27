@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-<!-- CURVIMETER SAFETY v8.0 — Укриття Чорноморська -->
+<!-- CURVIMETER SAFETY v9.0 — Укриття Чорноморська -->
 <!-- Авторка: Олеся Бохонок | Ліцензія: MIT -->
-<!-- v8.0: вбудований ORS-ключ, помітна кнопка API, автовідкриття налаштувань -->
+<!-- v9.0: OSRM FOSSGIS (без ключа) + опційний ORS -->
 <html lang="uk">
 <head>
 <meta charset="UTF-8">
@@ -17,7 +17,7 @@
   script-src 'self' 'unsafe-inline' https://unpkg.com;
   style-src 'self' 'unsafe-inline' https://unpkg.com;
   img-src 'self' data: blob: https://*.tile.openstreetmap.org https://server.arcgisonline.com;
-  connect-src 'self' https://*.tile.openstreetmap.org https://server.arcgisonline.com https://nominatim.openstreetmap.org https://api.openrouteservice.org;
+  connect-src 'self' https://*.tile.openstreetmap.org https://server.arcgisonline.com https://nominatim.openstreetmap.org https://routing.openstreetmap.de https://api.openrouteservice.org;
   font-src 'self' data:;
   object-src 'none';
   base-uri 'self';
@@ -65,12 +65,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
 .badge-btn { cursor: pointer; transition: 0.2s; }
 .badge-btn:hover, .badge-btn:active { background: rgba(0,255,178,0.15); border-color: var(--primary); color: var(--primary); }
 
-/* Помітна кнопка API */
-.badge-api { background: rgba(0,255,178,0.18); border-color: var(--primary); color: var(--primary); font-weight: 800; }
-.badge-api:hover, .badge-api:active { background: rgba(0,255,178,0.35); }
-
 .side-ctrl { position: absolute; right: 15px; bottom: calc(200px + var(--safe-bottom)); z-index: 6000; display: flex; flex-direction: column; gap: 12px; }
-.btn-icon { width: 54px; height: 54px; border-radius: 18px; background: var(--glass); border: 1px solid rgba(255,255,255,0.1); color: #fff; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); cursor: pointer; transition: 0.3s; user-select: none; }
+.btn-icon { width: 54px; height: 54px; border-radius: 18px; background: var(--glass); border: 1px solid rgba(255,255,255,0.1); color: #fff; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(20px); cursor: pointer; transition: 0.3s; user-select: none; }
 .btn-icon:active { transform: scale(0.95); }
 .btn-icon.active { border-color: var(--primary); color: var(--primary); box-shadow: 0 0 20px rgba(0,255,178,0.3); }
 .btn-icon.debug-active { border-color: var(--info); color: var(--info); box-shadow: 0 0 20px rgba(59,130,246,0.4); }
@@ -129,10 +125,10 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
 .modal input:focus, .modal select:focus, .modal textarea:focus { border-color: var(--primary); }
 .modal .hint { color: rgba(255,255,255,0.55); font-size: 0.72rem; margin-top: 6px; line-height: 1.5; }
 .modal a { color: var(--primary); }
-.key-status { padding: 10px 12px; border-radius: 10px; font-size: 0.78rem; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
-.key-status.ok { background: rgba(0,255,178,0.15); color: var(--primary); border: 1px solid var(--primary); }
-.key-status.missing { background: rgba(255,176,32,0.15); color: var(--warning); border: 1px solid var(--warning); }
-.key-status svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; flex-shrink: 0; }
+.engine-box { padding: 12px 14px; border-radius: 12px; font-size: 0.78rem; font-weight: 700; margin-bottom: 12px; display: flex; align-items: flex-start; gap: 10px; line-height: 1.4; }
+.engine-box.default { background: rgba(0,255,178,0.12); color: var(--primary); border: 1px solid var(--primary); }
+.engine-box.custom { background: rgba(59,130,246,0.12); color: var(--info); border: 1px solid var(--info); }
+.engine-box svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; flex-shrink: 0; margin-top: 1px; }
 
 .help-step { display: flex; gap: 14px; padding: 14px; background: rgba(255,255,255,0.04); border-radius: 14px; margin-bottom: 10px; border-left: 3px solid var(--primary); }
 .help-step-icon { width: 36px; height: 36px; border-radius: 10px; background: rgba(0,255,178,0.12); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -195,9 +191,9 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
     <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
     <span>Безпека</span>
   </button>
-  <button class="badge badge-btn badge-api" id="btn-settings">
+  <button class="badge badge-btn" id="btn-settings">
     <svg viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
-    <span id="api-btn-label">API-ключ</span>
+    <span>Маршрути</span>
   </button>
   <div class="badge">Олеся Бохонок</div>
 </div>
@@ -302,7 +298,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
     <h3><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01"/></svg><span>Як користуватись</span></h3>
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
-      <div class="help-step-body"><h4>Реальні маршрути</h4><p>Виберіть профіль (пішки / вело / авто) — маршрут будується по реальних тротуарах та дорогах. Ключ ORS уже вбудовано.</p></div>
+      <div class="help-step-body"><h4>Реальні маршрути</h4><p>Виберіть профіль (пішки / вело / авто) — маршрут будується по тротуарах та дорогах. Ключ не потрібен.</p></div>
     </div>
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg></div>
@@ -334,7 +330,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
     </div>
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg></div>
-      <div class="help-step-body"><h4>Зовнішні сервіси</h4><p>Геокодування — OpenStreetMap Nominatim. Маршрути — OpenRouteService (сервери в Німеччині). Карти — OSM, Esri.</p></div>
+      <div class="help-step-body"><h4>Зовнішні сервіси</h4><p>Геокодування — OSM Nominatim. Маршрути — OSRM FOSSGIS (без ключа) або OpenRouteService (якщо ви ввели ключ). Карти — OSM, Esri.</p></div>
     </div>
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M12 2v20M2 12h20"/></svg></div>
@@ -344,18 +340,25 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
   </div>
 </div>
 
-<!-- SETTINGS / API KEY -->
+<!-- SETTINGS -->
 <div class="modal-overlay" id="settings-modal">
   <div class="modal">
-    <h3><svg viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg><span>API-ключ OpenRouteService</span></h3>
-    <div class="key-status ok" id="key-status-box">
+    <h3><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg><span>Сервіс маршрутів</span></h3>
+
+    <div class="engine-box default" id="engine-box">
       <svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
-      <span id="key-status-text">Ключ активно. Реальні маршрути працюють!</span>
+      <div id="engine-text">
+        <strong>OSRM FOSSGIS</strong><br>
+        Працює без ключа. Реальні маршрути вже доступні.
+      </div>
     </div>
-    <p>Ключ вбудовано в застосунок. Ви можете замінити його на власний — він збережеться лише на вашому пристрої.</p>
-    <label for="ors-key">Замінити ключ (необов'язково)</label>
-    <input type="password" id="ors-key" placeholder="Вставте новий ключ або залиште порожнім">
-    <p class="hint">Створити свій безкоштовний ключ: <a href="https://openrouteservice.org/dev/#/signup" target="_blank" rel="noopener">openrouteservice.org</a> → Dashboard → Request a token.</p>
+
+    <p>За замовчуванням використовується безкоштовний OSRM-сервер від FOSSGIS. Він не потребує реєстрації та ключа. Якщо ви маєте власний ключ OpenRouteService, можете ввести його нижче — тоді маршрути будуть прокладатися через ORS (точніше, але ліміт 2000/день).</p>
+
+    <label for="ors-key">Власний ключ OpenRouteService (необов'язково)</label>
+    <input type="password" id="ors-key" placeholder="Залиште порожнім, щоб використовувати OSRM">
+    <p class="hint">Отримати безкоштовно: <a href="https://openrouteservice.org/dev/#/signup" target="_blank" rel="noopener">openrouteservice.org</a> → Dashboard → Request a token.</p>
+
     <div style="display:flex;gap:10px;margin-top:18px">
       <button class="modal-btn" id="btn-save-key">Зберегти</button>
       <button class="modal-btn danger" id="btn-clear-key">Скинути</button>
@@ -417,11 +420,6 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
 <script>
 'use strict';
 
-// ============================================================
-// ВБУДОВАНИЙ ORS API-КЛЮЧ
-// ============================================================
-const DEFAULT_ORS_KEY = 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImM3ODY2ZGJiZjUxZTQwNWI4NjJkNGU3ZjBlZTg4ZTI0IiwiaCI6Im11cm11cjY0In0=';
-
 const ICONS = {
   home:   '<svg viewBox="0 0 24 24"><path d="M3 21V7l9-4 9 4v14h-6v-7h-6v7H3z"/></svg>',
   shield: '<svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
@@ -448,59 +446,59 @@ function colorFor(type) {
 }
 
 const SHELTERS = [
-  { id: 1, name: "вул. Паркова, 8", address: "Паркова 8, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
-  { id: 2, name: "вул. Паркова, 14", address: "Паркова 14, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
-  { id: 3, name: "вул. Паркова, 20", address: "Паркова 20, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
-  { id: 4, name: "вул. Паркова, 36", address: "Паркова 36, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
-  { id: 5, name: "вул. Парусна, 7", address: "Парусна 7, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
-  { id: 6, name: "вул. Парусна, 10", address: "Парусна 10, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
-  { id: 7, name: "вул. Парусна, 11", address: "Парусна 11, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
-  { id: 8, name: "Проспект Миру, 8", address: "Проспект Миру 8, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
-  { id: 9, name: "Проспект Миру, 15Б", address: "Проспект Миру 15Б, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
-  { id: 10, name: "Проспект Миру, 26", address: "Проспект Миру 26, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
-  { id: 11, name: "Проспект Миру, 28", address: "Проспект Миру 28, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
-  { id: 12, name: "Проспект Миру, 32", address: "Проспект Миру 32, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
-  { id: 13, name: "Проспект Миру, 35Б", address: "Проспект Миру 35Б, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
-  { id: 14, name: "Проспект Миру, 35Г", address: "Проспект Миру 35Г, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
-  { id: 15, name: "Проспект Миру, 39", address: "Проспект Миру 39, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
-  { id: 16, name: "Проспект Миру, 41", address: "Проспект Миру 41, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
-  { id: 17, name: "вул. 1 Травня, 2", address: "1 Травня 2, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
-  { id: 18, name: "вул. 1 Травня, 5", address: "1 Травня 5, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
-  { id: 19, name: "вул. 1 Травня, 8А", address: "1 Травня 8А, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
-  { id: 20, name: "вул. 1 Травня, 17", address: "1 Травня 17, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
-  { id: 21, name: "вул. Хантадзе, 10", address: "Хантадзе 10, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
-  { id: 22, name: "вул. Олександрійська, 4", address: "Олександрійська 4, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
-  { id: 23, name: "вул. Віталія Шума, 13", address: "Віталія Шума 13, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
-  { id: 24, name: "вул. Віталія Шума, 19", address: "Віталія Шума 19, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
-  { id: 25, name: "вул. Захисників України, 33", address: "Захисників України 33, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 26, name: "вул. Захисників України, 35", address: "Захисників України 35, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 27, name: "вул. Захисників України, 36", address: "Захисників України 36, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 28, name: "вул. Захисників України, 37", address: "Захисників України 37, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 29, name: "вул. Захисників України, 38", address: "Захисників України 38, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 30, name: "вул. Захисників України, 39А", address: "Захисників України 39А, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 31, name: "вул. Захисників України, 40", address: "Захисників України 40, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 32, name: "вул. Захисників України, 43", address: "Захисників України 43, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 33, name: "вул. Захисників України, 44", address: "Захисників України 44, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 34, name: "вул. Захисників України, 45", address: "Захисників України 45, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 35, name: "вул. Захисників України, 47", address: "Захисників України 47, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 36, name: "вул. Захисників України, 90", address: "Захисників України 90, Чорноморськ", type: "Сховище", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 37, name: "вул. Курортна, 2", address: "Курортна 2, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 38, name: "вул. Сонячна, 1", address: "Сонячна 1, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 39, name: "вул. Сонячна, 2", address: "Сонячна 2, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 40, name: "вул. Сонячна, 3", address: "Сонячна 3, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 41, name: "вул. Сонячна, 4", address: "Сонячна 4, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 42, name: "с. Змієнкове, вул. Олімпійська, 4", address: "Олімпійська 4, Змієнкове", type: "Найпростіше укриття", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 43, name: "вул. Данченка, 3-Д", address: "Данченка 3, Чорноморськ", type: "Пункт обігріву", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 44, name: "вул. Паркова, 14-В", address: "Паркова 14В, Чорноморськ", type: "Пункт обігріву", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 45, name: "с. Малодолинське, вул. Миру, 17", address: "Миру 17, Малодолинське", type: "Пункт обігріву", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 46, name: "с. Бурлача Балка, вул. Інститутська, 22", address: "Інститутська 22, Бурлача Балка", type: "Пункт обігріву", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 47, name: "вул. В. Шума, 4 (лікарня)", address: "Віталія Шума 4, Чорноморськ", type: "Пункт обігріву / Лікарня", autoOpen: false, capacity: 280, source: "Омбудсман 2024" },
-  { id: 48, name: "сел. Олександрівка, вул. Центральна, 58", address: "Центральна 58, Олександрівка, Чорноморськ", type: "Пункт обігріву", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 49, name: "вул. 1 Травня, 1 (поліклініка)", address: "1 Травня 1, Чорноморськ", type: "Пункт обігріву / Поліклініка", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 50, name: "сел. Олександрівка, вул. Перемоги, 64", address: "Перемоги 64, Олександрівка, Чорноморськ", type: "Пункт обігріву", autoOpen: false, capacity: 0, source: "chr.gov.ua" },
-  { id: 51, name: "Порт — модульне укриття №1", address: "Морський вокзал, Чорноморськ", type: "Модульне укриття", autoOpen: true, capacity: 0, source: "Порт 2025" },
-  { id: 52, name: "Порт — модульне укриття №2", address: "Приморський бульвар, Чорноморськ", type: "Модульне укриття", autoOpen: true, capacity: 0, source: "Порт 2025" },
-  { id: 53, name: "Порт — модульне укриття №3", address: "Порт, Чорноморськ", type: "Модульне укриття", autoOpen: true, capacity: 0, source: "Порт 2025" }
+  { id: 1, name: "вул. Паркова, 8", address: "Паркова 8, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0 },
+  { id: 2, name: "вул. Паркова, 14", address: "Паркова 14, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0 },
+  { id: 3, name: "вул. Паркова, 20", address: "Паркова 20, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0 },
+  { id: 4, name: "вул. Паркова, 36", address: "Паркова 36, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0 },
+  { id: 5, name: "вул. Парусна, 7", address: "Парусна 7, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0 },
+  { id: 6, name: "вул. Парусна, 10", address: "Парусна 10, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0 },
+  { id: 7, name: "вул. Парусна, 11", address: "Парусна 11, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0 },
+  { id: 8, name: "Проспект Миру, 8", address: "Проспект Миру 8, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0 },
+  { id: 9, name: "Проспект Миру, 15Б", address: "Проспект Миру 15Б, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0 },
+  { id: 10, name: "Проспект Миру, 26", address: "Проспект Миру 26, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0 },
+  { id: 11, name: "Проспект Миру, 28", address: "Проспект Миру 28, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0 },
+  { id: 12, name: "Проспект Миру, 32", address: "Проспект Миру 32, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0 },
+  { id: 13, name: "Проспект Миру, 35Б", address: "Проспект Миру 35Б, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0 },
+  { id: 14, name: "Проспект Миру, 35Г", address: "Проспект Миру 35Г, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0 },
+  { id: 15, name: "Проспект Миру, 39", address: "Проспект Миру 39, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0 },
+  { id: 16, name: "Проспект Миру, 41", address: "Проспект Миру 41, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0 },
+  { id: 17, name: "вул. 1 Травня, 2", address: "1 Травня 2, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0 },
+  { id: 18, name: "вул. 1 Травня, 5", address: "1 Травня 5, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0 },
+  { id: 19, name: "вул. 1 Травня, 8А", address: "1 Травня 8А, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0 },
+  { id: 20, name: "вул. 1 Травня, 17", address: "1 Травня 17, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0 },
+  { id: 21, name: "вул. Хантадзе, 10", address: "Хантадзе 10, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0 },
+  { id: 22, name: "вул. Олександрійська, 4", address: "Олександрійська 4, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0 },
+  { id: 23, name: "вул. Віталія Шума, 13", address: "Віталія Шума 13, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0 },
+  { id: 24, name: "вул. Віталія Шума, 19", address: "Віталія Шума 19, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0 },
+  { id: 25, name: "вул. Захисників України, 33", address: "Захисників України 33, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0 },
+  { id: 26, name: "вул. Захисників України, 35", address: "Захисників України 35, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0 },
+  { id: 27, name: "вул. Захисників України, 36", address: "Захисників України 36, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0 },
+  { id: 28, name: "вул. Захисників України, 37", address: "Захисників України 37, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0 },
+  { id: 29, name: "вул. Захисників України, 38", address: "Захисників України 38, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0 },
+  { id: 30, name: "вул. Захисників України, 39А", address: "Захисників України 39А, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0 },
+  { id: 31, name: "вул. Захисників України, 40", address: "Захисників України 40, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0 },
+  { id: 32, name: "вул. Захисників України, 43", address: "Захисників України 43, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0 },
+  { id: 33, name: "вул. Захисників України, 44", address: "Захисників України 44, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0 },
+  { id: 34, name: "вул. Захисників України, 45", address: "Захисників України 45, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0 },
+  { id: 35, name: "вул. Захисників України, 47", address: "Захисників України 47, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0 },
+  { id: 36, name: "вул. Захисників України, 90", address: "Захисників України 90, Чорноморськ", type: "Сховище", autoOpen: false, capacity: 0 },
+  { id: 37, name: "вул. Курортна, 2", address: "Курортна 2, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0 },
+  { id: 38, name: "вул. Сонячна, 1", address: "Сонячна 1, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0 },
+  { id: 39, name: "вул. Сонячна, 2", address: "Сонячна 2, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0 },
+  { id: 40, name: "вул. Сонячна, 3", address: "Сонячна 3, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0 },
+  { id: 41, name: "вул. Сонячна, 4", address: "Сонячна 4, Чорноморськ", type: "Найпростіше укриття", autoOpen: false, capacity: 0 },
+  { id: 42, name: "с. Змієнкове, вул. Олімпійська, 4", address: "Олімпійська 4, Змієнкове", type: "Найпростіше укриття", autoOpen: false, capacity: 0 },
+  { id: 43, name: "вул. Данченка, 3-Д", address: "Данченка 3, Чорноморськ", type: "Пункт обігріву", autoOpen: false, capacity: 0 },
+  { id: 44, name: "вул. Паркова, 14-В", address: "Паркова 14В, Чорноморськ", type: "Пункт обігріву", autoOpen: false, capacity: 0 },
+  { id: 45, name: "с. Малодолинське, вул. Миру, 17", address: "Миру 17, Малодолинське", type: "Пункт обігріву", autoOpen: false, capacity: 0 },
+  { id: 46, name: "с. Бурлача Балка, вул. Інститутська, 22", address: "Інститутська 22, Бурлача Балка", type: "Пункт обігріву", autoOpen: false, capacity: 0 },
+  { id: 47, name: "вул. В. Шума, 4 (лікарня)", address: "Віталія Шума 4, Чорноморськ", type: "Пункт обігріву / Лікарня", autoOpen: false, capacity: 280 },
+  { id: 48, name: "сел. Олександрівка, вул. Центральна, 58", address: "Центральна 58, Олександрівка, Чорноморськ", type: "Пункт обігріву", autoOpen: false, capacity: 0 },
+  { id: 49, name: "вул. 1 Травня, 1 (поліклініка)", address: "1 Травня 1, Чорноморськ", type: "Пункт обігріву / Поліклініка", autoOpen: false, capacity: 0 },
+  { id: 50, name: "сел. Олександрівка, вул. Перемоги, 64", address: "Перемоги 64, Олександрівка, Чорноморськ", type: "Пункт обігріву", autoOpen: false, capacity: 0 },
+  { id: 51, name: "Порт — модульне укриття №1", address: "Морський вокзал, Чорноморськ", type: "Модульне укриття", autoOpen: true, capacity: 0 },
+  { id: 52, name: "Порт — модульне укриття №2", address: "Приморський бульвар, Чорноморськ", type: "Модульне укриття", autoOpen: true, capacity: 0 },
+  { id: 53, name: "Порт — модульне укриття №3", address: "Порт, Чорноморськ", type: "Модульне укриття", autoOpen: true, capacity: 0 }
 ];
 
 const state = {
@@ -537,32 +535,19 @@ function showToast(msg, ms = 2500, type = 'info') {
 }
 
 // ============================================================
-// ORS API KEY
+// КЛЮЧ ORS (необов'язковий)
 // ============================================================
 const ORS_KEY_STORAGE = 'safety_ors_key_v1';
 
 function getOrsKey() {
   try {
-    const userKey = localStorage.getItem(ORS_KEY_STORAGE);
-    if (userKey && userKey.length > 20) return userKey;
-  } catch (e) {}
-  return DEFAULT_ORS_KEY;
-}
-
-function setOrsKey(key) {
-  try { localStorage.setItem(ORS_KEY_STORAGE, key); } catch (e) {}
-}
-
-function clearOrsKey() {
-  try { localStorage.removeItem(ORS_KEY_STORAGE); } catch (e) {}
-}
-
-function isUserKeySet() {
-  try {
     const k = localStorage.getItem(ORS_KEY_STORAGE);
-    return !!(k && k.length > 20);
-  } catch (e) { return false; }
+    if (k && k.length > 20) return k;
+  } catch (e) {}
+  return null;
 }
+function setOrsKey(key) { try { localStorage.setItem(ORS_KEY_STORAGE, key); } catch (e) {} }
+function clearOrsKey() { try { localStorage.removeItem(ORS_KEY_STORAGE); } catch (e) {} }
 
 // ============================================================
 // ГЕОКОДУВАННЯ
@@ -626,12 +611,8 @@ async function geocodeAllShelters(force = false) {
 // ============================================================
 // КАЛІБРУВАННЯ
 // ============================================================
-function applyCalibration(lat, lng) {
-  return [lat + state.calibration.dLat, lng + state.calibration.dLng];
-}
-function saveCalibrationToStorage() {
-  try { localStorage.setItem('safety_calibration_v1', JSON.stringify(state.calibration)); } catch (e) {}
-}
+function applyCalibration(lat, lng) { return [lat + state.calibration.dLat, lng + state.calibration.dLng]; }
+function saveCalibrationToStorage() { try { localStorage.setItem('safety_calibration_v1', JSON.stringify(state.calibration)); } catch (e) {} }
 function loadCalibrationFromStorage() {
   try {
     const raw = localStorage.getItem('safety_calibration_v1');
@@ -650,8 +631,7 @@ function offsetInMeters() {
 // ============================================================
 // КАРТА
 // ============================================================
-const map = L.map('map', { zoomControl: false, attributionControl: false, inertia: true })
-  .setView([46.3050, 30.6600], 14);
+const map = L.map('map', { zoomControl: false, attributionControl: false, inertia: true }).setView([46.3050, 30.6600], 14);
 
 const TRANSPARENT_PX = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 
@@ -693,9 +673,6 @@ function toggleMapLayer() {
 
 const routeLayer = L.layerGroup().addTo(map);
 
-// ============================================================
-// МАРКЕРИ
-// ============================================================
 function shelterIcon(type) {
   const color = colorFor(type);
   const icon = ICONS.home;
@@ -774,8 +751,50 @@ function selectShelterById(id) {
 }
 
 // ============================================================
-// МАРШРУТ
+// МАРШРУТИ — OSRM FOSSGIS (без ключа) + ORS (з ключем, якщо введено)
 // ============================================================
+async function routeViaOsmFossgis(uLat, uLng, sLat, sLng) {
+  const profileMap = {
+    'foot-walking':     { instance: 'routed-foot', profile: 'walking' },
+    'cycling-regular':  { instance: 'routed-bike', profile: 'cycling' },
+    'driving-car':      { instance: 'routed-car',  profile: 'driving' }
+  };
+  const p = profileMap[state.profile];
+  const coordsStr = uLng + ',' + uLat + ';' + sLng + ',' + sLat;
+  const url = 'https://routing.openstreetmap.de/' + p.instance + '/route/v1/' + p.profile + '/' + coordsStr + '?geometries=geojson&overview=full&steps=false';
+
+  const response = await fetch(url);
+  if (!response.ok) throw new Error('OSRM ' + response.status);
+  const data = await response.json();
+  if (!data.routes || !data.routes[0]) throw new Error('Немає маршруту OSRM');
+  const r = data.routes[0];
+  return {
+    coords: r.geometry.coordinates.map(c => [c[1], c[0]]),
+    distance: r.distance,
+    duration: r.duration,
+    engine: 'OSRM'
+  };
+}
+
+async function routeViaOrs(uLat, uLng, sLat, sLng, key) {
+  const url = 'https://api.openrouteservice.org/v2/directions/' + state.profile + '/geojson';
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Authorization': key, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ coordinates: [[uLng, uLat], [sLng, sLat]], preference: 'recommended', units: 'm' })
+  });
+  if (!response.ok) throw new Error('ORS ' + response.status);
+  const data = await response.json();
+  const f = data.features && data.features[0];
+  if (!f) throw new Error('Немає маршруту ORS');
+  return {
+    coords: f.geometry.coordinates.map(c => [c[1], c[0]]),
+    distance: f.properties.summary.distance,
+    duration: f.properties.summary.duration,
+    engine: 'ORS'
+  };
+}
+
 async function selectShelter(shelter) {
   state.selectedShelter = shelter;
   haptic('medium');
@@ -789,69 +808,50 @@ async function selectShelter(shelter) {
   const [uLat, uLng] = applyCalibration(state.userLatLng.lat, state.userLatLng.lng);
   const [sLat, sLng] = applyCalibration(coords.lat, coords.lng);
 
+  document.getElementById('res-val').textContent = '...';
+  document.getElementById('res-unit').textContent = 'ШУКАЮ МАРШРУТ';
+
+  let result = null;
   const orsKey = getOrsKey();
-  if (!orsKey) {
+
+  // Спроба 1: ORS (якщо є власний ключ)
+  if (orsKey) {
+    try {
+      result = await routeViaOrs(uLat, uLng, sLat, sLng, orsKey);
+    } catch (e) {
+      console.warn('ORS failed, fallback to OSRM:', e);
+    }
+  }
+
+  // Спроба 2: OSRM FOSSGIS (без ключа, завжди працює)
+  if (!result) {
+    try {
+      result = await routeViaOsmFossgis(uLat, uLng, sLat, sLng);
+    } catch (e) {
+      console.warn('OSRM failed:', e);
+    }
+  }
+
+  // Якщо обидва впали — пряма лінія
+  if (!result) {
     drawStraightLine(uLat, uLng, sLat, sLng, shelter.name);
-    setTimeout(() => openSettings(), 400);
-    showToast('Потрібен API-ключ для реальних маршрутів', 3500, 'warning');
+    showToast('Сервіс маршрутів недоступний. Показано пряму.', 3500, 'warning');
     closeShelterList();
     return;
   }
 
-  document.getElementById('res-val').textContent = '...';
-  document.getElementById('res-unit').textContent = 'ШУКАЮ МАРШРУТ';
+  // Малюємо маршрут
+  state.routeData = { distance: result.distance, duration: result.duration };
 
-  try {
-    const url = 'https://api.openrouteservice.org/v2/directions/' + state.profile + '/geojson';
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': orsKey,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        coordinates: [[uLng, uLat], [sLng, sLat]],
-        preference: 'recommended',
-        units: 'm'
-      })
-    });
+  L.polyline(result.coords, { color: '#000000', weight: 9, opacity: 0.5, lineCap: 'round' }).addTo(routeLayer);
+  state.routeLine = L.polyline(result.coords, { color: '#00FFB2', weight: 5, opacity: 1, lineCap: 'round' }).addTo(routeLayer);
 
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error('ORS ' + response.status + ': ' + errText);
-    }
+  L.circleMarker(result.coords[0], { radius: 6, color: '#3B82F6', fillColor: '#3B82F6', fillOpacity: 1, weight: 2 }).addTo(routeLayer);
+  L.circleMarker(result.coords[result.coords.length - 1], { radius: 6, color: '#00FFB2', fillColor: '#00FFB2', fillOpacity: 1, weight: 2 }).addTo(routeLayer);
 
-    const data = await response.json();
-    const feature = data.features && data.features[0];
-    if (!feature) throw new Error('Немає маршруту');
-
-    const routeCoords = feature.geometry.coordinates.map(c => [c[1], c[0]]);
-    const distance = feature.properties.summary.distance;
-    const duration = feature.properties.summary.duration;
-
-    state.routeData = { distance, duration };
-
-    L.polyline(routeCoords, { color: '#000000', weight: 9, opacity: 0.5, lineCap: 'round' }).addTo(routeLayer);
-    state.routeLine = L.polyline(routeCoords, { color: '#00FFB2', weight: 5, opacity: 1, lineCap: 'round' }).addTo(routeLayer);
-
-    L.circleMarker(routeCoords[0], { radius: 6, color: '#3B82F6', fillColor: '#3B82F6', fillOpacity: 1, weight: 2 }).addTo(routeLayer);
-    L.circleMarker(routeCoords[routeCoords.length - 1], { radius: 6, color: '#00FFB2', fillColor: '#00FFB2', fillOpacity: 1, weight: 2 }).addTo(routeLayer);
-
-    updateRouteHUD(distance, duration, shelter.name);
-    map.fitBounds(state.routeLine.getBounds(), { padding: [80, 80] });
-    document.getElementById('profile-selector').classList.add('visible');
-  } catch (e) {
-    console.warn('ORS failed:', e);
-    drawStraightLine(uLat, uLng, sLat, sLng, shelter.name);
-    const errMsg = e.message || '';
-    if (errMsg.includes('403') || errMsg.includes('401')) {
-      showToast('Ключ ORS недійсний. Введіть новий через «API-ключ».', 4000, 'error');
-      setTimeout(() => openSettings(), 500);
-    } else {
-      showToast('ORS недоступний. Показано пряму відстань.', 3500, 'warning');
-    }
-  }
-
+  updateRouteHUD(result.distance, result.duration, shelter.name);
+  map.fitBounds(state.routeLine.getBounds(), { padding: [80, 80] });
+  document.getElementById('profile-selector').classList.add('visible');
   closeShelterList();
 }
 
@@ -893,9 +893,7 @@ function locateUser() {
   showToast('Визначаю місце...', 2000);
   navigator.geolocation.getCurrentPosition(
     pos => {
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-      const acc = pos.coords.accuracy;
+      const lat = pos.coords.latitude, lng = pos.coords.longitude, acc = pos.coords.accuracy;
       state.userLatLng = { lat, lng };
       if (state.userMarker) map.removeLayer(state.userMarker);
       if (state.accuracyCircle) map.removeLayer(state.accuracyCircle);
@@ -939,14 +937,8 @@ function findNearest() {
 // ============================================================
 // СПИСОК
 // ============================================================
-function openShelterList() {
-  renderShelterList();
-  document.getElementById('shelter-panel').classList.add('open');
-  haptic('light');
-}
-function closeShelterList() {
-  document.getElementById('shelter-panel').classList.remove('open');
-}
+function openShelterList() { renderShelterList(); document.getElementById('shelter-panel').classList.add('open'); haptic('light'); }
+function closeShelterList() { document.getElementById('shelter-panel').classList.remove('open'); }
 function renderShelterList() {
   const list = document.getElementById('shelter-list');
   list.innerHTML = '';
@@ -1025,10 +1017,7 @@ function onDebugClick(e) {
   const { lat, lng } = e.latlng;
   if (state.debugPopup) map.closePopup(state.debugPopup);
   const content = document.createElement('div');
-  content.style.fontFamily = 'monospace';
-  content.style.fontSize = '0.85rem';
-  content.style.lineHeight = '1.6';
-  content.style.color = '#fff';
+  content.style.cssText = 'font-family:monospace;font-size:0.85rem;line-height:1.6;color:#fff';
   content.innerHTML = '<div style="color:#3B82F6;font-weight:800;margin-bottom:6px;">Coordinates</div>lat: <b>' + lat.toFixed(6) + '</b><br>lng: <b>' + lng.toFixed(6) + '</b>';
   const copyBtn = document.createElement('button');
   copyBtn.style.cssText = 'margin-top:8px;padding:6px 12px;background:#3B82F6;color:#fff;border:none;border-radius:8px;font-weight:bold;cursor:pointer;';
@@ -1040,16 +1029,11 @@ function onDebugClick(e) {
 function copyCoords(lat, lng) {
   const text = '{ lat: ' + lat.toFixed(6) + ', lng: ' + lng.toFixed(6) + ' }';
   if (navigator.clipboard) {
-    navigator.clipboard.writeText(text).then(() => {
-      showToast('Скопійовано: ' + text, 2500, 'success');
-    }).catch(() => prompt('Координати:', text));
+    navigator.clipboard.writeText(text).then(() => showToast('Скопійовано: ' + text, 2500, 'success')).catch(() => prompt('Координати:', text));
   } else prompt('Координати:', text);
 }
 
-function openCalibrationModal() {
-  document.getElementById('calibration-modal').classList.add('active');
-  updateCalibrationDisplay();
-}
+function openCalibrationModal() { document.getElementById('calibration-modal').classList.add('active'); updateCalibrationDisplay(); }
 function closeCalibrationModal() { document.getElementById('calibration-modal').classList.remove('active'); }
 function updateCalibrationDisplay() {
   const el = document.getElementById('calibration-current');
@@ -1108,10 +1092,7 @@ function openAddModal() {
   document.getElementById('add-capacity').value = '';
   document.getElementById('add-notes').value = '';
 }
-function closeAddModal() {
-  document.getElementById('add-modal').classList.remove('active');
-  state.pendingCoords = null;
-}
+function closeAddModal() { document.getElementById('add-modal').classList.remove('active'); state.pendingCoords = null; }
 function saveNewShelter() {
   const name = document.getElementById('add-name').value.trim();
   if (!name) { showToast('Введіть адресу або назву', 2000, 'warning'); return; }
@@ -1123,7 +1104,6 @@ function saveNewShelter() {
     type: document.getElementById('add-type').value,
     autoOpen: document.getElementById('add-auto').value === 'true',
     capacity: parseInt(document.getElementById('add-capacity').value) || 0,
-    source: 'Додано користувачем',
     notes: document.getElementById('add-notes').value.trim()
   };
   state.userShelters.push(newShelter);
@@ -1141,12 +1121,12 @@ function loadUserShelters() {
 
 function exportCSV() {
   const items = getAllShelters();
-  const headers = ['id', 'name', 'lat', 'lng', 'type', 'autoOpen', 'capacity', 'source'];
+  const headers = ['id', 'name', 'lat', 'lng', 'type', 'autoOpen', 'capacity'];
   const rows = items.map(s => {
     const c = getShelterCoords(s) || { lat: '', lng: '' };
     return [s.id, '"' + (s.name || '').replace(/"/g, '""') + '"', c.lat, c.lng,
       '"' + (s.type || '').replace(/"/g, '""') + '"', s.autoOpen ? 'так' : 'ні',
-      s.capacity || 0, '"' + (s.source || '').replace(/"/g, '""') + '"'].join(',');
+      s.capacity || 0].join(',');
   });
   downloadFile('shelters-chornomorsk.csv', headers.join(',') + '\n' + rows.join('\n'), 'text/csv;charset=utf-8');
   showToast('Файл завантажено: CSV', 2000, 'success');
@@ -1184,45 +1164,44 @@ function openHelp() { document.getElementById('help-modal').classList.add('activ
 function closeHelp() { document.getElementById('help-modal').classList.remove('active'); }
 function openSafety() { document.getElementById('safety-modal').classList.add('active'); }
 function closeSafety() { document.getElementById('safety-modal').classList.remove('active'); }
+
 function openSettings() {
   document.getElementById('settings-modal').classList.add('active');
-  updateKeyStatus();
+  updateEngineBox();
   document.getElementById('ors-key').value = '';
 }
 function closeSettings() { document.getElementById('settings-modal').classList.remove('active'); }
-function updateKeyStatus() {
-  const box = document.getElementById('key-status-box');
-  const text = document.getElementById('key-status-text');
-  if (isUserKeySet()) {
-    box.className = 'key-status ok';
-    text.textContent = 'Ваш власний ключ активний. Реальні маршрути працюють.';
-  } else if (DEFAULT_ORS_KEY && DEFAULT_ORS_KEY.length > 20) {
-    box.className = 'key-status ok';
-    text.textContent = 'Вбудований ключ активний. Реальні маршрути працюють.';
+function updateEngineBox() {
+  const box = document.getElementById('engine-box');
+  const text = document.getElementById('engine-text');
+  if (getOrsKey()) {
+    box.className = 'engine-box custom';
+    text.innerHTML = '<strong>OpenRouteService (ваш ключ)</strong><br>Маршрути прокладаються через ORS. Якщо він недоступний — автоматично OSRM.';
   } else {
-    box.className = 'key-status missing';
-    text.textContent = 'Ключ відсутній. Маршрути будуть прямими.';
+    box.className = 'engine-box default';
+    text.innerHTML = '<strong>OSRM FOSSGIS</strong><br>Працює без ключа. Реальні маршрути вже доступні.';
   }
 }
 function saveOrsKeyFromInput() {
   const val = document.getElementById('ors-key').value.trim();
   if (!val || val.length < 20) { showToast('Введіть коректний ключ', 2000, 'warning'); return; }
   setOrsKey(val);
+  updateEngineBox();
   closeSettings();
-  showToast('Ключ збережено', 2000, 'success');
+  showToast('Ключ збережено. Тепер маршрути через ORS.', 2500, 'success');
 }
 function clearOrsKeyAndClose() {
-  if (!confirm('Скинути ваш ключ? Буде використано вбудований.')) return;
+  if (!getOrsKey()) { showToast('Ключа немає', 1500, 'info'); return; }
+  if (!confirm('Скинути ваш ключ ORS? Буде використано OSRM (без ключа).')) return;
   clearOrsKey();
   document.getElementById('ors-key').value = '';
-  updateKeyStatus();
-  showToast('Ваш ключ скинуто', 1500);
+  updateEngineBox();
+  showToast('Ключ скинуто. Використовується OSRM.', 2000);
 }
 function toggleLang() {
   const isUk = document.documentElement.lang === 'uk';
   document.documentElement.lang = isUk ? 'en' : 'uk';
   document.getElementById('res-unit').textContent = isUk ? 'METERS' : 'МЕТРІВ';
-  document.getElementById('api-btn-label').textContent = isUk ? 'API key' : 'API-ключ';
   renderShelterList();
   haptic('light');
 }
@@ -1230,9 +1209,7 @@ function switchProfile(profile) {
   state.profile = profile;
   document.querySelectorAll('.profile-btn').forEach(b => b.classList.toggle('active', b.dataset.profile === profile));
   haptic('light');
-  if (state.selectedShelter && state.userLatLng) {
-    selectShelter(state.selectedShelter);
-  }
+  if (state.selectedShelter && state.userLatLng) selectShelter(state.selectedShelter);
 }
 
 window.addEventListener('load', async () => {
@@ -1273,7 +1250,6 @@ window.addEventListener('load', async () => {
   document.getElementById('profile-bike').addEventListener('click', () => switchProfile('cycling-regular'));
   document.getElementById('profile-car').addEventListener('click', () => switchProfile('driving-car'));
 
-  // Геокодування
   const cache = loadGeocodeCache();
   getAllShelters().forEach(s => { if (cache[s.id]) state.geocoded[s.id] = cache[s.id]; });
   const needGeocode = getAllShelters().filter(s => !state.geocoded[s.id]);
@@ -1286,7 +1262,7 @@ window.addEventListener('load', async () => {
     if (navigator.geolocation && window.isSecureContext) locateUser();
   }, 800);
 
-  console.log('Curvimeter SAFETY v8.0 — ORS key: ' + (isUserKeySet() ? 'user' : 'default') + ' | profile: ' + state.profile);
+  console.log('Curvimeter SAFETY v9.0 — OSRM FOSSGIS (no key required) | ORS key:', getOrsKey() ? 'set' : 'not set');
 });
 
 document.addEventListener('keydown', (e) => {
