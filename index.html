@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-<!-- CURVIMETER SAFETY v7.0 — Укриття Чорноморська -->
+<!-- CURVIMETER SAFETY v8.0 — Укриття Чорноморська -->
 <!-- Авторка: Олеся Бохонок | Ліцензія: MIT -->
-<!-- v7.0: реальні маршрути через OpenRouteService (пішки/вело/авто) -->
+<!-- v8.0: вбудований ORS-ключ, помітна кнопка API, автовідкриття налаштувань -->
 <html lang="uk">
 <head>
 <meta charset="UTF-8">
@@ -10,7 +10,6 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Укриття Чорноморськ">
 <meta name="theme-color" content="#05070A">
-<meta name="description" content="Укриття Чорноморська — науково-дослідний інструмент">
 <meta name="author" content="Olesia Bokhonok">
 
 <meta http-equiv="Content-Security-Policy" content="
@@ -37,10 +36,9 @@
   --danger: #FF3B5E;
   --warning: #FFB020;
   --info: #3B82F6;
-  --bg: #05070A;
   --glass: rgba(12, 16, 25, 0.92);
   --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', Consolas, monospace;
-  --font-main: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, 'Helvetica Neue', sans-serif;
+  --font-main: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -52,151 +50,60 @@ svg { display: block; }
 #map { position: absolute; inset: 0; z-index: 1; background: #1a1a1a; }
 canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000; pointer-events: none; }
 
-.hud {
-  position: absolute; top: calc(20px + var(--safe-top)); left: 50%;
-  transform: translateX(-50%); z-index: 5000; text-align: center;
-  pointer-events: none;
-}
-.dist-val {
-  font-family: var(--font-mono); font-size: clamp(2rem, 8vw, 3.6rem);
-  font-weight: 200; color: var(--primary); line-height: 0.9;
-  text-shadow: 0 0 30px rgba(0,255,178,0.5), 0 4px 10px rgba(0,0,0,0.9);
-}
-.dist-unit {
-  font-size: 0.6rem; letter-spacing: 4px; color: #fff; text-transform: uppercase;
-  margin-top: 8px; background: rgba(0,0,0,0.6); padding: 4px 10px;
-  border-radius: 20px; display: inline-block;
-}
-.shelter-name-hud {
-  font-family: var(--font-mono); font-size: 0.68rem; color: #fff;
-  background: rgba(0,0,0,0.7); padding: 6px 12px; border-radius: 10px;
-  margin-top: 8px; display: none; max-width: 90vw;
-}
+.hud { position: absolute; top: calc(20px + var(--safe-top)); left: 50%; transform: translateX(-50%); z-index: 5000; text-align: center; pointer-events: none; }
+.dist-val { font-family: var(--font-mono); font-size: clamp(2rem, 8vw, 3.6rem); font-weight: 200; color: var(--primary); line-height: 0.9; text-shadow: 0 0 30px rgba(0,255,178,0.5), 0 4px 10px rgba(0,0,0,0.9); }
+.dist-unit { font-size: 0.6rem; letter-spacing: 4px; color: #fff; text-transform: uppercase; margin-top: 8px; background: rgba(0,0,0,0.6); padding: 4px 10px; border-radius: 20px; display: inline-block; }
+.shelter-name-hud { font-family: var(--font-mono); font-size: 0.68rem; color: #fff; background: rgba(0,0,0,0.7); padding: 6px 12px; border-radius: 10px; margin-top: 8px; display: none; max-width: 90vw; }
 .shelter-name-hud.visible { display: inline-block; }
-.layer-indicator {
-  font-family: var(--font-mono); font-size: 0.55rem; color: rgba(255,255,255,0.75);
-  background: rgba(0,0,0,0.55); padding: 4px 10px; border-radius: 10px;
-  margin-top: 6px; display: inline-flex; align-items: center; gap: 5px;
-}
+.layer-indicator { font-family: var(--font-mono); font-size: 0.55rem; color: rgba(255,255,255,0.75); background: rgba(0,0,0,0.55); padding: 4px 10px; border-radius: 10px; margin-top: 6px; display: inline-flex; align-items: center; gap: 5px; }
 .layer-indicator svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 2; }
 
-.branding {
-  position: absolute; top: calc(10px + var(--safe-top)); left: 10px;
-  z-index: 5000; font-family: var(--font-mono); font-size: 0.5rem;
-  display: flex; flex-direction: column; gap: 3px; align-items: flex-start;
-}
-.badge {
-  background: var(--glass); padding: 5px 9px; border-radius: 8px;
-  border: 1px solid rgba(255,255,255,0.1); color: #fff; font-size: 0.45rem;
-  display: inline-flex; align-items: center; gap: 5px;
-}
+.branding { position: absolute; top: calc(10px + var(--safe-top)); left: 10px; z-index: 5000; font-family: var(--font-mono); font-size: 0.5rem; display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
+.badge { background: var(--glass); padding: 5px 9px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); color: #fff; font-size: 0.45rem; display: inline-flex; align-items: center; gap: 5px; }
 .badge svg { width: 11px; height: 11px; stroke: currentColor; fill: none; stroke-width: 2; }
 .badge-brand { color: var(--primary); font-weight: 800; font-size: 0.5rem; }
 .badge-btn { cursor: pointer; transition: 0.2s; }
 .badge-btn:hover, .badge-btn:active { background: rgba(0,255,178,0.15); border-color: var(--primary); color: var(--primary); }
 
-.side-ctrl {
-  position: absolute; right: 15px; bottom: calc(200px + var(--safe-bottom));
-  z-index: 6000; display: flex; flex-direction: column; gap: 12px;
-}
-.btn-icon {
-  width: 54px; height: 54px; border-radius: 18px; background: var(--glass);
-  border: 1px solid rgba(255,255,255,0.1); color: #fff;
-  display: flex; align-items: center; justify-content: center;
-  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-  cursor: pointer; transition: 0.3s; user-select: none;
-}
+/* Помітна кнопка API */
+.badge-api { background: rgba(0,255,178,0.18); border-color: var(--primary); color: var(--primary); font-weight: 800; }
+.badge-api:hover, .badge-api:active { background: rgba(0,255,178,0.35); }
+
+.side-ctrl { position: absolute; right: 15px; bottom: calc(200px + var(--safe-bottom)); z-index: 6000; display: flex; flex-direction: column; gap: 12px; }
+.btn-icon { width: 54px; height: 54px; border-radius: 18px; background: var(--glass); border: 1px solid rgba(255,255,255,0.1); color: #fff; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); cursor: pointer; transition: 0.3s; user-select: none; }
 .btn-icon:active { transform: scale(0.95); }
 .btn-icon.active { border-color: var(--primary); color: var(--primary); box-shadow: 0 0 20px rgba(0,255,178,0.3); }
 .btn-icon.debug-active { border-color: var(--info); color: var(--info); box-shadow: 0 0 20px rgba(59,130,246,0.4); }
 .btn-icon svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
-.chassis {
-  position: absolute; bottom: 0; left: 0; right: 0; z-index: 6000;
-  background: linear-gradient(to top, #000 85%, transparent);
-  padding: 24px 20px calc(20px + var(--safe-bottom));
-  display: flex; flex-direction: column; gap: 12px; align-items: center;
-}
-.btn-main {
-  width: 100%; max-width: 340px; height: 58px; border-radius: 20px;
-  font-weight: 800; letter-spacing: 1.5px; font-size: 0.88rem;
-  background: var(--primary); color: #000;
-  box-shadow: 0 10px 30px rgba(0,255,178,0.2);
-  display: flex; align-items: center; justify-content: center; gap: 10px;
-}
+.chassis { position: absolute; bottom: 0; left: 0; right: 0; z-index: 6000; background: linear-gradient(to top, #000 85%, transparent); padding: 24px 20px calc(20px + var(--safe-bottom)); display: flex; flex-direction: column; gap: 12px; align-items: center; }
+.btn-main { width: 100%; max-width: 340px; height: 58px; border-radius: 20px; font-weight: 800; letter-spacing: 1.5px; font-size: 0.88rem; background: var(--primary); color: #000; box-shadow: 0 10px 30px rgba(0,255,178,0.2); display: flex; align-items: center; justify-content: center; gap: 10px; }
 .btn-main svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.2; }
 .btn-main:active { transform: scale(0.98); }
 .btn-main.sos { background: var(--danger); color: #fff; box-shadow: 0 10px 30px rgba(255,59,94,0.3); }
 .btn-row { display: flex; gap: 10px; width: 100%; max-width: 340px; }
 .btn-row .btn-icon { flex: 1; }
 
-/* Профіль маршруту */
-.profile-selector {
-  position: absolute;
-  top: calc(200px + var(--safe-top));
-  left: 50%; transform: translateX(-50%);
-  z-index: 5500;
-  display: none;
-  background: var(--glass);
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 14px;
-  padding: 4px;
-  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.6);
-}
+.profile-selector { position: absolute; top: calc(200px + var(--safe-top)); left: 50%; transform: translateX(-50%); z-index: 5500; display: none; background: var(--glass); border: 1px solid rgba(255,255,255,0.15); border-radius: 14px; padding: 4px; backdrop-filter: blur(20px); box-shadow: 0 10px 30px rgba(0,0,0,0.6); }
 .profile-selector.visible { display: flex; }
-.profile-btn {
-  padding: 8px 14px;
-  background: transparent;
-  border-radius: 10px;
-  color: #fff;
-  font-weight: 800;
-  font-size: 0.7rem;
-  letter-spacing: 0.5px;
-  display: inline-flex; align-items: center; gap: 6px;
-  transition: 0.2s;
-}
+.profile-btn { padding: 8px 14px; background: transparent; border-radius: 10px; color: #fff; font-weight: 800; font-size: 0.7rem; letter-spacing: 0.5px; display: inline-flex; align-items: center; gap: 6px; transition: 0.2s; }
 .profile-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; }
 .profile-btn.active { background: var(--primary); color: #000; }
 
-.shelter-panel {
-  position: absolute; left: 0; right: 0; bottom: 0;
-  background: var(--glass); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px);
-  border-radius: 24px 24px 0 0; border-top: 1px solid rgba(255,255,255,0.15);
-  max-height: 75vh; z-index: 6500;
-  transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  display: flex; flex-direction: column;
-  box-shadow: 0 -10px 40px rgba(0,0,0,0.7);
-}
+.shelter-panel { position: absolute; left: 0; right: 0; bottom: 0; background: var(--glass); backdrop-filter: blur(30px); border-radius: 24px 24px 0 0; border-top: 1px solid rgba(255,255,255,0.15); max-height: 75vh; z-index: 6500; transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; box-shadow: 0 -10px 40px rgba(0,0,0,0.7); }
 .shelter-panel.open { transform: translateY(0); }
-.shelter-header {
-  padding: 16px 20px 12px; display: flex; align-items: center; justify-content: space-between;
-  border-bottom: 1px solid rgba(255,255,255,0.08); flex-shrink: 0;
-}
-.shelter-header h2 {
-  color: var(--primary); font-size: 0.95rem; font-weight: 800;
-  letter-spacing: 1px; display: flex; align-items: center; gap: 8px;
-}
+.shelter-header { padding: 16px 20px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.08); flex-shrink: 0; }
+.shelter-header h2 { color: var(--primary); font-size: 0.95rem; font-weight: 800; letter-spacing: 1px; display: flex; align-items: center; gap: 8px; }
 .shelter-header h2 svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; }
 .shelter-actions { display: flex; gap: 8px; }
-.shelter-action {
-  width: 36px; height: 36px; border-radius: 12px; background: rgba(255,255,255,0.08);
-  color: #fff; display: flex; align-items: center; justify-content: center; transition: 0.2s;
-}
-.shelter-action:hover, .shelter-action:active { background: rgba(0,255,178,0.15); color: var(--primary); }
+.shelter-action { width: 36px; height: 36px; border-radius: 12px; background: rgba(255,255,255,0.08); color: #fff; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+.shelter-action:active { background: rgba(0,255,178,0.15); color: var(--primary); }
 .shelter-action svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; }
 .shelter-list { overflow-y: auto; padding: 8px; -webkit-overflow-scrolling: touch; flex: 1; }
 
-.shelter-item {
-  padding: 14px; background: rgba(255,255,255,0.04); border-radius: 14px;
-  margin-bottom: 8px; display: flex; align-items: center; gap: 12px;
-  cursor: pointer; transition: 0.2s; border: 1px solid transparent;
-}
+.shelter-item { padding: 14px; background: rgba(255,255,255,0.04); border-radius: 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: 0.2s; border: 1px solid transparent; }
 .shelter-item:active { background: rgba(0,255,178,0.12); border-color: var(--primary); }
-.shelter-item .icon {
-  width: 40px; height: 40px; border-radius: 12px; background: rgba(255,59,94,0.12);
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
+.shelter-item .icon { width: 40px; height: 40px; border-radius: 12px; background: rgba(255,59,94,0.12); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .shelter-item .icon svg { width: 20px; height: 20px; fill: none; stroke: var(--danger); stroke-width: 1.8; }
 .shelter-item .icon.shield svg { stroke: var(--primary); }
 .shelter-item .icon.shield { background: rgba(0,255,178,0.12); }
@@ -207,91 +114,49 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
 .shelter-item .info { flex: 1; min-width: 0; }
 .shelter-item .name { color: #fff; font-size: 0.85rem; font-weight: 700; margin-bottom: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .shelter-item .meta { color: rgba(255,255,255,0.55); font-size: 0.68rem; font-family: var(--font-mono); }
-.shelter-item .distance {
-  color: var(--primary); font-family: var(--font-mono); font-weight: 800;
-  font-size: 0.82rem; text-align: right; flex-shrink: 0; margin-left: 8px;
-}
+.shelter-item .distance { color: var(--primary); font-family: var(--font-mono); font-weight: 800; font-size: 0.82rem; text-align: right; flex-shrink: 0; margin-left: 8px; }
 .shelter-item .distance.far { color: var(--warning); }
 .shelter-item .distance.very-far { color: var(--danger); }
 
-.modal-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 10000;
-  display: none; align-items: center; justify-content: center; padding: 20px;
-}
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 10000; display: none; align-items: center; justify-content: center; padding: 20px; }
 .modal-overlay.active { display: flex; }
-.modal {
-  background: var(--glass); border: 1px solid rgba(255,255,255,0.2);
-  border-radius: 24px; padding: 26px 24px; max-width: 460px; width: 100%;
-  max-height: 88vh; overflow-y: auto;
-}
-.modal h3 {
-  color: var(--primary); font-size: 1.15rem; margin-bottom: 16px;
-  font-weight: 800; display: flex; align-items: center; gap: 10px;
-}
+.modal { background: var(--glass); border: 1px solid rgba(255,255,255,0.2); border-radius: 24px; padding: 26px 24px; max-width: 460px; width: 100%; max-height: 88vh; overflow-y: auto; }
+.modal h3 { color: var(--primary); font-size: 1.15rem; margin-bottom: 16px; font-weight: 800; display: flex; align-items: center; gap: 10px; }
 .modal h3 svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; flex-shrink: 0; }
 .modal p { color: #fff; font-size: 0.85rem; line-height: 1.6; margin-bottom: 14px; }
 .modal label { display: block; color: rgba(255,255,255,0.75); font-size: 0.75rem; font-weight: 700; margin-bottom: 6px; margin-top: 12px; }
-.modal input[type="text"], .modal input[type="number"], .modal input[type="password"], .modal select, .modal textarea {
-  width: 100%; padding: 11px 14px; background: rgba(0,0,0,0.4);
-  border: 1px solid rgba(255,255,255,0.15); border-radius: 10px;
-  color: #fff; font-family: var(--font-main); font-size: 0.88rem; outline: none;
-}
+.modal input, .modal select, .modal textarea { width: 100%; padding: 11px 14px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; color: #fff; font-family: var(--font-main); font-size: 0.88rem; outline: none; }
 .modal input:focus, .modal select:focus, .modal textarea:focus { border-color: var(--primary); }
 .modal .hint { color: rgba(255,255,255,0.55); font-size: 0.72rem; margin-top: 6px; line-height: 1.5; }
 .modal a { color: var(--primary); }
+.key-status { padding: 10px 12px; border-radius: 10px; font-size: 0.78rem; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.key-status.ok { background: rgba(0,255,178,0.15); color: var(--primary); border: 1px solid var(--primary); }
+.key-status.missing { background: rgba(255,176,32,0.15); color: var(--warning); border: 1px solid var(--warning); }
+.key-status svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; flex-shrink: 0; }
 
-.help-step {
-  display: flex; gap: 14px; padding: 14px; background: rgba(255,255,255,0.04);
-  border-radius: 14px; margin-bottom: 10px; border-left: 3px solid var(--primary);
-}
-.help-step-icon {
-  width: 36px; height: 36px; border-radius: 10px; background: rgba(0,255,178,0.12);
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
+.help-step { display: flex; gap: 14px; padding: 14px; background: rgba(255,255,255,0.04); border-radius: 14px; margin-bottom: 10px; border-left: 3px solid var(--primary); }
+.help-step-icon { width: 36px; height: 36px; border-radius: 10px; background: rgba(0,255,178,0.12); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .help-step-icon svg { width: 20px; height: 20px; fill: none; stroke: var(--primary); stroke-width: 2; }
 .help-step-body h4 { color: #fff; font-size: 0.85rem; font-weight: 700; margin-bottom: 4px; }
 .help-step-body p { color: rgba(255,255,255,0.75); font-size: 0.78rem; line-height: 1.5; margin: 0; }
 
-.modal-btn {
-  flex: 1; padding: 12px; border-radius: 12px; font-weight: 800; font-size: 0.9rem;
-  background: var(--primary); color: #000;
-  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-}
+.modal-btn { flex: 1; padding: 12px; border-radius: 12px; font-weight: 800; font-size: 0.9rem; background: var(--primary); color: #000; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
 .modal-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; }
 .modal-btn.secondary { background: rgba(255,255,255,0.08); color: #fff; }
+.modal-btn.danger { background: rgba(255,59,94,0.2); color: var(--danger); }
 
-.toast {
-  position: fixed; top: calc(28% + var(--safe-top)); left: 50%;
-  transform: translateX(-50%) translateY(-20px);
-  background: rgba(0,255,178,0.95); color: #000;
-  padding: 14px 22px; border-radius: 16px;
-  font-weight: 800; font-size: 0.88rem; z-index: 15000;
-  pointer-events: none; opacity: 0; transition: 0.4s;
-  max-width: calc(100vw - 40px); text-align: center;
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-}
+.toast { position: fixed; top: calc(28% + var(--safe-top)); left: 50%; transform: translateX(-50%) translateY(-20px); background: rgba(0,255,178,0.95); color: #000; padding: 14px 22px; border-radius: 16px; font-weight: 800; font-size: 0.88rem; z-index: 15000; pointer-events: none; opacity: 0; transition: 0.4s; max-width: calc(100vw - 40px); text-align: center; display: flex; align-items: center; justify-content: center; gap: 8px; }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .toast svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.4; flex-shrink: 0; }
 .toast.error { background: rgba(255,59,94,0.95); color: #fff; }
 .toast.warning { background: rgba(255,176,32,0.95); color: #000; }
 .toast.info { background: rgba(59,130,246,0.95); color: #fff; }
 
-.user-marker {
-  width: 20px; height: 20px; border-radius: 50%;
-  background: var(--info); border: 3px solid #fff;
-  box-shadow: 0 0 0 6px rgba(59,130,246,0.3), 0 4px 12px rgba(0,0,0,0.5);
-  animation: userPulse 2s ease-in-out infinite;
-}
-@keyframes userPulse {
-  0%, 100% { box-shadow: 0 0 0 6px rgba(59,130,246,0.3), 0 4px 12px rgba(0,0,0,0.5); }
-  50% { box-shadow: 0 0 0 12px rgba(59,130,246,0.15), 0 4px 12px rgba(0,0,0,0.5); }
-}
+.user-marker { width: 20px; height: 20px; border-radius: 50%; background: var(--info); border: 3px solid #fff; box-shadow: 0 0 0 6px rgba(59,130,246,0.3), 0 4px 12px rgba(0,0,0,0.5); animation: userPulse 2s ease-in-out infinite; }
+@keyframes userPulse { 0%, 100% { box-shadow: 0 0 0 6px rgba(59,130,246,0.3), 0 4px 12px rgba(0,0,0,0.5); } 50% { box-shadow: 0 0 0 12px rgba(59,130,246,0.15), 0 4px 12px rgba(0,0,0,0.5); } }
 .shelter-marker { background: transparent !important; border: none !important; }
 
-.leaflet-popup-content-wrapper {
-  background: var(--glass) !important; color: #fff !important;
-  border-radius: 14px !important; border: 1px solid rgba(255,255,255,0.15) !important;
-}
+.leaflet-popup-content-wrapper { background: var(--glass) !important; color: #fff !important; border-radius: 14px !important; border: 1px solid rgba(255,255,255,0.15) !important; }
 .leaflet-popup-tip { background: var(--glass) !important; }
 .leaflet-popup-content { margin: 14px 16px !important; }
 .leaflet-container a.leaflet-popup-close-button { color: #fff !important; }
@@ -299,26 +164,12 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
 .popup-title svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; flex-shrink: 0; }
 .popup-type { font-size: 0.72rem; color: rgba(255,255,255,0.75); margin-bottom: 4px; }
 .popup-meta { font-size: 0.68rem; color: rgba(255,255,255,0.55); font-family: var(--font-mono); margin-bottom: 10px; }
-.popup-btn {
-  width: 100%; padding: 9px; background: var(--primary); color: #000;
-  border: none; border-radius: 9px; font-weight: 800; font-size: 0.78rem;
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-}
+.popup-btn { width: 100%; padding: 9px; background: var(--primary); color: #000; border: none; border-radius: 9px; font-weight: 800; font-size: 0.78rem; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 .popup-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.2; }
 
-.loading-overlay {
-  position: fixed; inset: 0; z-index: 20000;
-  background: rgba(5,7,10,0.95); backdrop-filter: blur(10px);
-  display: none; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
-  color: #fff;
-}
+.loading-overlay { position: fixed; inset: 0; z-index: 20000; background: rgba(5,7,10,0.95); backdrop-filter: blur(10px); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 20px; color: #fff; }
 .loading-overlay.visible { display: flex; }
-.loading-spinner {
-  width: 60px; height: 60px; border-radius: 50%;
-  border: 4px solid rgba(0,255,178,0.2);
-  border-top-color: var(--primary);
-  animation: spin 1s linear infinite;
-}
+.loading-spinner { width: 60px; height: 60px; border-radius: 50%; border: 4px solid rgba(0,255,178,0.2); border-top-color: var(--primary); animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .loading-text { font-size: 0.9rem; font-weight: 700; text-align: center; }
 .loading-progress { font-family: var(--font-mono); font-size: 0.75rem; color: var(--primary); }
@@ -344,9 +195,9 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
     <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
     <span>Безпека</span>
   </button>
-  <button class="badge badge-btn" id="btn-settings">
-    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-    <span>API</span>
+  <button class="badge badge-btn badge-api" id="btn-settings">
+    <svg viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+    <span id="api-btn-label">API-ключ</span>
   </button>
   <div class="badge">Олеся Бохонок</div>
 </div>
@@ -361,7 +212,6 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
   </div>
 </div>
 
-<!-- Профіль маршруту -->
 <div class="profile-selector" id="profile-selector">
   <button class="profile-btn active" data-profile="foot-walking" id="profile-foot">
     <svg viewBox="0 0 24 24"><circle cx="12" cy="4" r="2"/><path d="M9 20l3-7 3 7M6 12l6-2 6 2"/></svg>
@@ -377,7 +227,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
   </button>
 </div>
 
-<nav class="side-ctrl" role="navigation">
+<nav class="side-ctrl">
   <button class="btn-icon" id="btn-layer" title="Шар карти">
     <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
   </button>
@@ -426,7 +276,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
   <div class="shelter-header">
     <h2>
       <svg viewBox="0 0 24 24"><path d="M3 21V7l9-4 9 4v14h-6v-7h-6v7H3z"/></svg>
-      <span id="panel-title">УКРИТТЯ ЧОРНОМОРСЬКА</span>
+      <span>УКРИТТЯ ЧОРНОМОРСЬКА</span>
     </h2>
     <div class="shelter-actions">
       <button class="shelter-action" id="btn-export-csv" title="CSV">
@@ -452,7 +302,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
     <h3><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01"/></svg><span>Як користуватись</span></h3>
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
-      <div class="help-step-body"><h4>Маршрути</h4><p>Виберіть профіль (пішки / вело / авто) — маршрут будується по реальних дорогах та тротуарах.</p></div>
+      <div class="help-step-body"><h4>Реальні маршрути</h4><p>Виберіть профіль (пішки / вело / авто) — маршрут будується по реальних тротуарах та дорогах. Ключ ORS уже вбудовано.</p></div>
     </div>
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg></div>
@@ -463,12 +313,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
       <div class="help-step-body"><h4>Калібрування</h4><p>Якщо маркери зсунуті — станьте на відомому місці та торкніться карти там, де ви насправді.</p></div>
     </div>
     <div class="help-step">
-      <div class="help-step-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
-      <div class="help-step-body"><h4>API-ключ</h4><p>Для реальних маршрутів потрібен безкоштовний ключ OpenRouteService. Натисніть кнопку «API» вгорі, щоб ввести його.</p></div>
-    </div>
-    <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/></svg></div>
-      <div class="help-step-body"><h4>Найближче укриття</h4><p>Зірка — знайти найближче укриття та показати маршрут.</p></div>
+      <div class="help-step-body"><h4>Найближче укриття</h4><p>Зірка — знайти найближче укриття та показати маршрут до нього.</p></div>
     </div>
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div>
@@ -488,7 +334,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
     </div>
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg></div>
-      <div class="help-step-body"><h4>Зовнішні сервіси</h4><p>Геокодування — OpenStreetMap Nominatim. Маршрути — OpenRouteService (сервери в ЄС). Карти — OSM, Esri.</p></div>
+      <div class="help-step-body"><h4>Зовнішні сервіси</h4><p>Геокодування — OpenStreetMap Nominatim. Маршрути — OpenRouteService (сервери в Німеччині). Карти — OSM, Esri.</p></div>
     </div>
     <div class="help-step">
       <div class="help-step-icon"><svg viewBox="0 0 24 24"><path d="M12 2v20M2 12h20"/></svg></div>
@@ -498,17 +344,21 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
   </div>
 </div>
 
-<!-- SETTINGS (API KEY) -->
+<!-- SETTINGS / API KEY -->
 <div class="modal-overlay" id="settings-modal">
   <div class="modal">
-    <h3><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span>API-ключ OpenRouteService</span></h3>
-    <p>Для прокладання реальних маршрутів потрібен безкоштовний ключ. Він зберігається лише на вашому пристрої.</p>
-    <label for="ors-key">API-ключ</label>
-    <input type="password" id="ors-key" placeholder="Вставте ваш ключ">
-    <p class="hint">Отримати безкоштовно: <a href="https://openrouteservice.org/dev/#/signup" target="_blank" rel="noopener">openrouteservice.org</a> → реєстрація (2 хв) → Dashboard → Request a token.</p>
+    <h3><svg viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg><span>API-ключ OpenRouteService</span></h3>
+    <div class="key-status ok" id="key-status-box">
+      <svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+      <span id="key-status-text">Ключ активно. Реальні маршрути працюють!</span>
+    </div>
+    <p>Ключ вбудовано в застосунок. Ви можете замінити його на власний — він збережеться лише на вашому пристрої.</p>
+    <label for="ors-key">Замінити ключ (необов'язково)</label>
+    <input type="password" id="ors-key" placeholder="Вставте новий ключ або залиште порожнім">
+    <p class="hint">Створити свій безкоштовний ключ: <a href="https://openrouteservice.org/dev/#/signup" target="_blank" rel="noopener">openrouteservice.org</a> → Dashboard → Request a token.</p>
     <div style="display:flex;gap:10px;margin-top:18px">
       <button class="modal-btn" id="btn-save-key">Зберегти</button>
-      <button class="modal-btn secondary" id="btn-clear-key">Скинути</button>
+      <button class="modal-btn danger" id="btn-clear-key">Скинути</button>
     </div>
     <button class="modal-btn secondary" id="btn-close-settings" style="margin-top:10px;width:100%">Закрити</button>
   </div>
@@ -522,7 +372,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
     <p id="calibration-current" style="text-align:center;font-family:var(--font-mono);font-size:0.8rem;color:rgba(255,255,255,0.6)">Калібрування не активне</p>
     <div style="display:flex;gap:10px;margin-top:16px">
       <button class="modal-btn" id="btn-calib-start"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg><span>Почати</span></button>
-      <button class="modal-btn" id="btn-calib-reset" style="background:rgba(255,59,94,0.15);color:#FF3B5E"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg><span>Скинути</span></button>
+      <button class="modal-btn danger" id="btn-calib-reset"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg><span>Скинути</span></button>
     </div>
     <button class="modal-btn secondary" id="btn-close-calib" style="margin-top:10px;width:100%">Закрити</button>
   </div>
@@ -568,8 +418,10 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1000;
 'use strict';
 
 // ============================================================
-// SVG-ІКОНКИ
+// ВБУДОВАНИЙ ORS API-КЛЮЧ
 // ============================================================
+const DEFAULT_ORS_KEY = 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImM3ODY2ZGJiZjUxZTQwNWI4NjJkNGU3ZjBlZTg4ZTI0IiwiaCI6Im11cm11cjY0In0=';
+
 const ICONS = {
   home:   '<svg viewBox="0 0 24 24"><path d="M3 21V7l9-4 9 4v14h-6v-7h-6v7H3z"/></svg>',
   shield: '<svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
@@ -595,9 +447,6 @@ function colorFor(type) {
   return '#FF3B5E';
 }
 
-// ============================================================
-// БАЗА УКРИТТІВ
-// ============================================================
 const SHELTERS = [
   { id: 1, name: "вул. Паркова, 8", address: "Паркова 8, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
   { id: 2, name: "вул. Паркова, 14", address: "Паркова 14, Чорноморськ", type: "Підвал житлового будинку", autoOpen: true, capacity: 0, source: "chr.gov.ua" },
@@ -654,34 +503,17 @@ const SHELTERS = [
   { id: 53, name: "Порт — модульне укриття №3", address: "Порт, Чорноморськ", type: "Модульне укриття", autoOpen: true, capacity: 0, source: "Порт 2025" }
 ];
 
-// ============================================================
-// СТАН
-// ============================================================
 const state = {
-  lang: 'uk',
-  userLatLng: null,
-  userMarker: null,
-  accuracyCircle: null,
-  selectedShelter: null,
-  routeLine: null,
-  shelterMarkers: {},
-  toastTimer: null,
-  currentLayer: 'hybrid',
-  debugMode: false,
-  debugPopup: null,
-  calibration: { dLat: 0, dLng: 0 },
-  calibrating: false,
-  userShelters: [],
-  pendingCoords: null,
-  geocoded: {},
-  geocoding: false,
-  profile: 'foot-walking',
-  routeData: null // { distance, duration }
+  userLatLng: null, userMarker: null, accuracyCircle: null,
+  selectedShelter: null, routeLine: null, shelterMarkers: {},
+  toastTimer: null, currentLayer: 'hybrid',
+  debugMode: false, debugPopup: null,
+  calibration: { dLat: 0, dLng: 0 }, calibrating: false,
+  userShelters: [], pendingCoords: null,
+  geocoded: {}, geocoding: false,
+  profile: 'foot-walking', routeData: null
 };
 
-// ============================================================
-// ХАПТИКА / TOAST
-// ============================================================
 function haptic(style) {
   if (!navigator.vibrate) return;
   const p = { light: [10], medium: [20], heavy: [30, 50, 30] };
@@ -710,13 +542,26 @@ function showToast(msg, ms = 2500, type = 'info') {
 const ORS_KEY_STORAGE = 'safety_ors_key_v1';
 
 function getOrsKey() {
-  try { return localStorage.getItem(ORS_KEY_STORAGE) || ''; } catch (e) { return ''; }
+  try {
+    const userKey = localStorage.getItem(ORS_KEY_STORAGE);
+    if (userKey && userKey.length > 20) return userKey;
+  } catch (e) {}
+  return DEFAULT_ORS_KEY;
 }
+
 function setOrsKey(key) {
   try { localStorage.setItem(ORS_KEY_STORAGE, key); } catch (e) {}
 }
+
 function clearOrsKey() {
   try { localStorage.removeItem(ORS_KEY_STORAGE); } catch (e) {}
+}
+
+function isUserKeySet() {
+  try {
+    const k = localStorage.getItem(ORS_KEY_STORAGE);
+    return !!(k && k.length > 20);
+  } catch (e) { return false; }
 }
 
 // ============================================================
@@ -929,7 +774,7 @@ function selectShelterById(id) {
 }
 
 // ============================================================
-// МАРШРУТ через OpenRouteService
+// МАРШРУТ
 // ============================================================
 async function selectShelter(shelter) {
   state.selectedShelter = shelter;
@@ -946,9 +791,9 @@ async function selectShelter(shelter) {
 
   const orsKey = getOrsKey();
   if (!orsKey) {
-    // Фолбек: пряма лінія
     drawStraightLine(uLat, uLng, sLat, sLng, shelter.name);
-    showToast('Немає API-ключа — показано пряму відстань. Натисніть «API» вгорі.', 4000, 'warning');
+    setTimeout(() => openSettings(), 400);
+    showToast('Потрібен API-ключ для реальних маршрутів', 3500, 'warning');
     closeShelterList();
     return;
   }
@@ -986,21 +831,25 @@ async function selectShelter(shelter) {
 
     state.routeData = { distance, duration };
 
-    // Малюємо маршрут з обводкою
     L.polyline(routeCoords, { color: '#000000', weight: 9, opacity: 0.5, lineCap: 'round' }).addTo(routeLayer);
     state.routeLine = L.polyline(routeCoords, { color: '#00FFB2', weight: 5, opacity: 1, lineCap: 'round' }).addTo(routeLayer);
 
-    // Старт і фініш
     L.circleMarker(routeCoords[0], { radius: 6, color: '#3B82F6', fillColor: '#3B82F6', fillOpacity: 1, weight: 2 }).addTo(routeLayer);
     L.circleMarker(routeCoords[routeCoords.length - 1], { radius: 6, color: '#00FFB2', fillColor: '#00FFB2', fillOpacity: 1, weight: 2 }).addTo(routeLayer);
 
     updateRouteHUD(distance, duration, shelter.name);
     map.fitBounds(state.routeLine.getBounds(), { padding: [80, 80] });
+    document.getElementById('profile-selector').classList.add('visible');
   } catch (e) {
     console.warn('ORS failed:', e);
-    // Фолбек: пряма
     drawStraightLine(uLat, uLng, sLat, sLng, shelter.name);
-    showToast('ORS недоступний. Показано пряму відстань.', 3500, 'warning');
+    const errMsg = e.message || '';
+    if (errMsg.includes('403') || errMsg.includes('401')) {
+      showToast('Ключ ORS недійсний. Введіть новий через «API-ключ».', 4000, 'error');
+      setTimeout(() => openSettings(), 500);
+    } else {
+      showToast('ORS недоступний. Показано пряму відстань.', 3500, 'warning');
+    }
   }
 
   closeShelterList();
@@ -1070,9 +919,6 @@ function locateUser() {
   );
 }
 
-// ============================================================
-// НАЙБЛИЖЧЕ
-// ============================================================
 function findNearest() {
   if (!state.userLatLng) { showToast('Спочатку визначте своє місце', 2500, 'warning'); locateUser(); return; }
   haptic('heavy');
@@ -1144,9 +990,6 @@ function renderShelterList() {
   });
 }
 
-// ============================================================
-// ОЧИЩЕННЯ / SOS
-// ============================================================
 function clearRoute() {
   routeLayer.clearLayers();
   state.routeLine = null;
@@ -1164,9 +1007,6 @@ function callEmergency() {
   if (confirm('Зателефонувати 101?')) window.location.href = 'tel:101';
 }
 
-// ============================================================
-// DEBUG MODE
-// ============================================================
 function toggleDebugMode() {
   state.debugMode = !state.debugMode;
   haptic('medium');
@@ -1206,9 +1046,6 @@ function copyCoords(lat, lng) {
   } else prompt('Координати:', text);
 }
 
-// ============================================================
-// КАЛІБРУВАННЯ UI
-// ============================================================
 function openCalibrationModal() {
   document.getElementById('calibration-modal').classList.add('active');
   updateCalibrationDisplay();
@@ -1256,9 +1093,6 @@ function resetCalibration() {
   showToast('Калібрування скинуто', 2000);
 }
 
-// ============================================================
-// ADD SHELTER
-// ============================================================
 function openAddModal() {
   haptic('light');
   document.getElementById('add-modal').classList.add('active');
@@ -1305,9 +1139,6 @@ function loadUserShelters() {
   try { const raw = localStorage.getItem('safety_user_shelters_v1'); if (raw) state.userShelters = JSON.parse(raw) || []; } catch (e) { state.userShelters = []; }
 }
 
-// ============================================================
-// EXPORT
-// ============================================================
 function exportCSV() {
   const items = getAllShelters();
   const headers = ['id', 'name', 'lat', 'lng', 'type', 'autoOpen', 'capacity', 'source'];
@@ -1349,37 +1180,49 @@ async function resetGeocode() {
   showToast('Координати оновлено', 2000, 'success');
 }
 
-// ============================================================
-// МОДАЛЬНІ
-// ============================================================
 function openHelp() { document.getElementById('help-modal').classList.add('active'); }
 function closeHelp() { document.getElementById('help-modal').classList.remove('active'); }
 function openSafety() { document.getElementById('safety-modal').classList.add('active'); }
 function closeSafety() { document.getElementById('safety-modal').classList.remove('active'); }
 function openSettings() {
   document.getElementById('settings-modal').classList.add('active');
-  const key = getOrsKey();
-  document.getElementById('ors-key').value = key ? '••••••••' + key.slice(-6) : '';
+  updateKeyStatus();
+  document.getElementById('ors-key').value = '';
 }
 function closeSettings() { document.getElementById('settings-modal').classList.remove('active'); }
+function updateKeyStatus() {
+  const box = document.getElementById('key-status-box');
+  const text = document.getElementById('key-status-text');
+  if (isUserKeySet()) {
+    box.className = 'key-status ok';
+    text.textContent = 'Ваш власний ключ активний. Реальні маршрути працюють.';
+  } else if (DEFAULT_ORS_KEY && DEFAULT_ORS_KEY.length > 20) {
+    box.className = 'key-status ok';
+    text.textContent = 'Вбудований ключ активний. Реальні маршрути працюють.';
+  } else {
+    box.className = 'key-status missing';
+    text.textContent = 'Ключ відсутній. Маршрути будуть прямими.';
+  }
+}
 function saveOrsKeyFromInput() {
   const val = document.getElementById('ors-key').value.trim();
-  if (!val || val.startsWith('••••')) { showToast('Введіть новий ключ', 2000, 'warning'); return; }
+  if (!val || val.length < 20) { showToast('Введіть коректний ключ', 2000, 'warning'); return; }
   setOrsKey(val);
   closeSettings();
-  showToast('Ключ збережено. Тепер маршрути реальні!', 2500, 'success');
+  showToast('Ключ збережено', 2000, 'success');
 }
 function clearOrsKeyAndClose() {
-  if (!confirm('Скинути API-ключ?')) return;
+  if (!confirm('Скинути ваш ключ? Буде використано вбудований.')) return;
   clearOrsKey();
   document.getElementById('ors-key').value = '';
-  closeSettings();
-  showToast('Ключ скинуто', 1500);
+  updateKeyStatus();
+  showToast('Ваш ключ скинуто', 1500);
 }
 function toggleLang() {
-  state.lang = state.lang === 'uk' ? 'en' : 'uk';
-  document.documentElement.lang = state.lang;
-  document.getElementById('res-unit').textContent = state.lang === 'uk' ? 'МЕТРІВ' : 'METERS';
+  const isUk = document.documentElement.lang === 'uk';
+  document.documentElement.lang = isUk ? 'en' : 'uk';
+  document.getElementById('res-unit').textContent = isUk ? 'METERS' : 'МЕТРІВ';
+  document.getElementById('api-btn-label').textContent = isUk ? 'API key' : 'API-ключ';
   renderShelterList();
   haptic('light');
 }
@@ -1387,21 +1230,16 @@ function switchProfile(profile) {
   state.profile = profile;
   document.querySelectorAll('.profile-btn').forEach(b => b.classList.toggle('active', b.dataset.profile === profile));
   haptic('light');
-  // Якщо маршрут уже є — перерахувати
   if (state.selectedShelter && state.userLatLng) {
     selectShelter(state.selectedShelter);
   }
 }
 
-// ============================================================
-// ІНІЦІАЛІЗАЦІЯ
-// ============================================================
 window.addEventListener('load', async () => {
   setTimeout(() => map.invalidateSize(), 300);
   loadCalibrationFromStorage();
   loadUserShelters();
 
-  // Обробники
   document.getElementById('btn-help').addEventListener('click', openHelp);
   document.getElementById('btn-safety').addEventListener('click', openSafety);
   document.getElementById('btn-settings').addEventListener('click', openSettings);
@@ -1448,15 +1286,8 @@ window.addEventListener('load', async () => {
     if (navigator.geolocation && window.isSecureContext) locateUser();
   }, 800);
 
-  console.log('Curvimeter SAFETY v7.0 — ORS routing, profile:', state.profile, '| key:', getOrsKey() ? 'set' : 'not set');
+  console.log('Curvimeter SAFETY v8.0 — ORS key: ' + (isUserKeySet() ? 'user' : 'default') + ' | profile: ' + state.profile);
 });
-
-// Показати селектор профілю при наявності маршруту
-const observer = new MutationObserver(() => {
-  const has = !!state.routeLine;
-  document.getElementById('profile-selector').classList.toggle('visible', has);
-});
-observer.observe(document.getElementById('shelter-name-hud'), { attributes: true, attributeFilter: ['class'] });
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
